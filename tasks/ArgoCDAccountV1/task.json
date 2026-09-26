@@ -1,0 +1,170 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+    "id": "f7f79a13-e122-42d3-b9df-29308cee7c47",
+    "name": "ArgoCDAccount",
+    "friendlyName": "Argo CD Account",
+    "description": "Manage Argo CD local account tokens, and check what a token is permitted to do.",
+    "helpMarkDown": "[Documentation](https://github.com/WayneGoosen/azdo-argocd-tasks) | [Report an issue](https://github.com/WayneGoosen/azdo-argocd-tasks/issues)\n\nPrefer a project role token (**ArgoCDProject@1**) when one project is enough \u2014 its blast radius is smaller.",
+    "category": "Utility",
+    "author": "WayneGoosen",
+    "version": {
+        "Major": 1,
+        "Minor": 0,
+        "Patch": 0
+    },
+    "minimumAgentVersion": "4.248.0",
+    "instanceNameFormat": "Argo CD account $(command)",
+    "inputs": [
+        {
+            "name": "connection",
+            "type": "connectedService:argocd",
+            "label": "Argo CD service connection",
+            "required": true,
+            "helpMarkDown": "Minting tokens needs a token with `update` permission on the project or account."
+        },
+        {
+            "name": "command",
+            "type": "pickList",
+            "label": "Command",
+            "defaultValue": "can-i",
+            "required": true,
+            "options": {
+                "can-i": "can-i - check whether this token may do something",
+                "list": "list - list local accounts",
+                "get": "get - read one account and its tokens",
+                "create-token": "create-token - mint an account token",
+                "delete-token": "delete-token - revoke a token by ID"
+            }
+        },
+        {
+            "name": "account",
+            "type": "string",
+            "label": "Account",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command = get || command = create-token || command = delete-token",
+            "helpMarkDown": "Local account name. The account needs the `apiKey` capability in `argocd-cm` to hold tokens."
+        },
+        {
+            "name": "expiresIn",
+            "type": "string",
+            "label": "Expires in",
+            "defaultValue": "90d",
+            "required": false,
+            "visibleRule": "command = create-token",
+            "helpMarkDown": "Token lifetime: a number of seconds, or a number with a unit (`s`, `m`, `h`, `d`, `w`). **`0` means the token never expires.**"
+        },
+        {
+            "name": "tokenId",
+            "type": "string",
+            "label": "Token ID",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command = delete-token"
+        },
+        {
+            "name": "resource",
+            "type": "pickList",
+            "label": "Resource",
+            "defaultValue": "applications",
+            "required": false,
+            "visibleRule": "command = can-i",
+            "options": {
+                "applications": "applications",
+                "applicationsets": "applicationsets",
+                "projects": "projects",
+                "repositories": "repositories",
+                "write-repositories": "write-repositories",
+                "clusters": "clusters",
+                "accounts": "accounts",
+                "certificates": "certificates",
+                "gpgkeys": "gpgkeys",
+                "logs": "logs",
+                "exec": "exec",
+                "extensions": "extensions"
+            }
+        },
+        {
+            "name": "action",
+            "type": "pickList",
+            "label": "Action",
+            "defaultValue": "sync",
+            "required": false,
+            "visibleRule": "command = can-i",
+            "options": {
+                "get": "get",
+                "create": "create",
+                "update": "update",
+                "delete": "delete",
+                "sync": "sync",
+                "override": "override",
+                "action": "action",
+                "invoke": "invoke"
+            }
+        },
+        {
+            "name": "subresource",
+            "type": "string",
+            "label": "Subresource",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command = can-i",
+            "helpMarkDown": "What to check against, for example `payments/payments-api` or `payments/*`. Leave empty to ask about the resource as a whole."
+        },
+        {
+            "name": "failIfDenied",
+            "type": "boolean",
+            "label": "Fail if denied",
+            "defaultValue": "false",
+            "required": false,
+            "visibleRule": "command = can-i",
+            "helpMarkDown": "Fail the task when the answer is no. Useful as an early assertion that a pipeline holds the permissions it needs."
+        }
+    ],
+    "outputVariables": [
+        {
+            "name": "token",
+            "description": "The minted token. Secret; only available immediately after creation."
+        },
+        {
+            "name": "tokenId",
+            "description": "ID of the minted token, used to revoke it later."
+        },
+        {
+            "name": "tokenCount",
+            "description": "Number of tokens remaining on the account."
+        },
+        {
+            "name": "tokenIds",
+            "description": "Comma-separated token IDs on the account."
+        },
+        {
+            "name": "accountCount",
+            "description": "Number of accounts found."
+        },
+        {
+            "name": "allowed",
+            "description": "true or false, the answer to a can-i check."
+        }
+    ],
+    "execution": {
+        "Node20_1": {
+            "target": "index.js"
+        },
+        "Node24": {
+            "target": "index.js"
+        }
+    },
+    "restrictions": {
+        "settableVariables": {
+            "allowed": [
+                "token",
+                "tokenId",
+                "tokenCount",
+                "tokenIds",
+                "accountCount",
+                "allowed"
+            ]
+        }
+    }
+}

@@ -1,0 +1,20 @@
+# Wait for a whole app-of-apps to converge, selected by label.
+#
+# The selector is resolved once, up front, so the run acts on a stable list even if
+# applications are created or deleted while it waits.
+trigger: none
+
+jobs:
+  - job: WaitForPlatform
+    pool: { vmImage: ubuntu-latest }
+    steps:
+      - task: ArgoCDApp@1
+        displayName: Wait for the platform stack
+        inputs:
+          connection: 'argocd-prod'
+          command: 'wait'
+          selector: 'app.kubernetes.io/instance=platform'
+          project: 'platform'
+          waitFor: 'sync,health'
+          timeoutSeconds: '1800'
+          pollIntervalSeconds: '10'

@@ -1,0 +1,6 @@
+{
+    "id": "argocd-pipeline-tasks-dev",
+    "name": "Argo CD Pipeline Tasks (Dev)",
+    "public": false,
+    "description": "DEV/TEST build of Argo CD Pipeline Tasks. Not for production use."
+}

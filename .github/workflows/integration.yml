@@ -1,0 +1,92 @@
+# Integration tests against real Argo CD servers.
+#
+# The contract test proves the SPEC still says what the client assumes. Only a real server
+# proves the server behaves that way -- most pointedly the CLI /download route, which is
+# Linux-only and serves only the server's own architecture, a fact no amount of spec reading
+# reveals.
+#
+# Runs across every currently supported Argo CD minor. Argo CD supports only the three most
+# recent, and ships a new minor quarterly, so this matrix needs updating roughly that often.
+name: Integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - 'tasks/**'
+      - 'scripts/**'
+      - 'test/**'
+      - '.github/workflows/integration.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - 'tasks/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest first: a break there is the most informative, since the client is written
+        # against the oldest supported minor.
+        argocd: ['3.3.14', '3.4.9', '3.5.3']
+    name: Argo CD ${{ matrix.argocd }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: node scripts/build.mjs
+        name: Build the task bundles
+
+      - name: Install kind and the Argo CD CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /usr/local/bin/kind \
+            https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64
+          chmod +x /usr/local/bin/kind
+          curl -fsSL -o /usr/local/bin/argocd \
+            "https://github.com/argoproj/argo-cd/releases/download/v${{ matrix.argocd }}/argocd-linux-amd64"
+          chmod +x /usr/local/bin/argocd
+          kind version
+          argocd version --client
+
+      - name: Stand up Argo CD ${{ matrix.argocd }}
+        env:
+          PERSIST_PORT_FORWARD: 'true'
+          CREATE_SAMPLE_APP: 'true'
+          LOCAL_PORT: '8080'
+        run: ./scripts/kind-argocd.sh "${{ matrix.argocd }}"
+
+      - name: Run integration tests
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source .argocd-env
+          export ARGOCD_TEST_APP=guestbook
+          export ARGOCD_TEST_PROJECT=default
+          npx vitest run test/integration --testTimeout=600000
+
+      - name: Dump Argo CD state on failure
+        if: failure()
+        run: |
+          kubectl get applications -n argocd -o wide || true
+          kubectl get pods -A || true
+          kubectl logs -n argocd deploy/argocd-server --tail=100 || true
+          kubectl logs -n argocd statefulset/argocd-application-controller --tail=100 || true
+
+      - name: Tear down
+        if: always()
+        run: kind delete cluster --name argocd-test || true

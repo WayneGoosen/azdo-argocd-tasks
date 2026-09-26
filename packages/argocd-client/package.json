@@ -1,0 +1,10 @@
+{
+    "name": "@azdo-argocd/argocd-client",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Typed REST client for the Argo CD API (grpc-gateway)",
+    "license": "Apache-2.0",
+    "main": "src/index.ts",
+    "types": "src/index.ts",
+    "sideEffects": false
+}

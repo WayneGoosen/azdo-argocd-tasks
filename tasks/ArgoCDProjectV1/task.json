@@ -1,0 +1,122 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+    "id": "dfacc01f-c5b9-4296-9997-4066b96cb1fc",
+    "name": "ArgoCDProject",
+    "friendlyName": "Argo CD Project",
+    "description": "Read Argo CD projects and manage project role tokens.",
+    "helpMarkDown": "[Documentation](https://github.com/WayneGoosen/azdo-argocd-tasks) | [Report an issue](https://github.com/WayneGoosen/azdo-argocd-tasks/issues)\n\nUse this to rotate the Argo CD credential your pipelines authenticate with. See the token rotation guide.",
+    "category": "Utility",
+    "author": "WayneGoosen",
+    "version": {
+        "Major": 1,
+        "Minor": 0,
+        "Patch": 0
+    },
+    "minimumAgentVersion": "4.248.0",
+    "instanceNameFormat": "Argo CD project $(command)",
+    "inputs": [
+        {
+            "name": "connection",
+            "type": "connectedService:argocd",
+            "label": "Argo CD service connection",
+            "required": true,
+            "helpMarkDown": "Minting tokens needs a token with `update` permission on the project or account."
+        },
+        {
+            "name": "command",
+            "type": "pickList",
+            "label": "Command",
+            "defaultValue": "list",
+            "required": true,
+            "options": {
+                "list": "list - list projects",
+                "get": "get - read one project and its roles",
+                "list-tokens": "list-tokens - list token IDs on a role",
+                "create-token": "create-token - mint a project role token",
+                "delete-token": "delete-token - revoke a token by ID"
+            }
+        },
+        {
+            "name": "project",
+            "type": "string",
+            "label": "Project",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command != list",
+            "helpMarkDown": "Name of the AppProject."
+        },
+        {
+            "name": "role",
+            "type": "string",
+            "label": "Role",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command = list-tokens || command = create-token || command = delete-token",
+            "helpMarkDown": "Role within the project, for example `ado-ci`."
+        },
+        {
+            "name": "expiresIn",
+            "type": "string",
+            "label": "Expires in",
+            "defaultValue": "90d",
+            "required": false,
+            "visibleRule": "command = create-token",
+            "helpMarkDown": "Token lifetime: a number of seconds, or a number with a unit (`s`, `m`, `h`, `d`, `w`). **`0` means the token never expires.**"
+        },
+        {
+            "name": "tokenId",
+            "type": "string",
+            "label": "Token ID",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command = delete-token",
+            "helpMarkDown": "ID of the token to revoke, as reported by `create-token` or `list-tokens`."
+        }
+    ],
+    "outputVariables": [
+        {
+            "name": "token",
+            "description": "The minted token. Secret; only available immediately after creation."
+        },
+        {
+            "name": "tokenId",
+            "description": "ID of the minted token, used to revoke it later."
+        },
+        {
+            "name": "tokenCount",
+            "description": "Number of tokens remaining on the role."
+        },
+        {
+            "name": "tokenIds",
+            "description": "Comma-separated token IDs on the role."
+        },
+        {
+            "name": "projectCount",
+            "description": "Number of projects found."
+        },
+        {
+            "name": "roleCount",
+            "description": "Number of roles on the project."
+        }
+    ],
+    "execution": {
+        "Node20_1": {
+            "target": "index.js"
+        },
+        "Node24": {
+            "target": "index.js"
+        }
+    },
+    "restrictions": {
+        "settableVariables": {
+            "allowed": [
+                "token",
+                "tokenId",
+                "tokenCount",
+                "tokenIds",
+                "projectCount",
+                "roleCount"
+            ]
+        }
+    }
+}

@@ -1,0 +1,104 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+    "id": "b36058bc-2d24-41c0-93bf-8998452454f7",
+    "name": "ArgoCDCli",
+    "friendlyName": "Argo CD CLI",
+    "description": "Run any argocd command with the service connection's server and token injected.",
+    "helpMarkDown": "[Documentation](https://github.com/WayneGoosen/azdo-argocd-tasks) | [Report an issue](https://github.com/WayneGoosen/azdo-argocd-tasks/issues)\n\nRequires the CLI on PATH -- add an **ArgoCDInstall@1** step first. The token is passed to the CLI through the process environment only, never on the command line.",
+    "category": "Deploy",
+    "author": "WayneGoosen",
+    "version": {
+        "Major": 1,
+        "Minor": 0,
+        "Patch": 0
+    },
+    "minimumAgentVersion": "4.248.0",
+    "instanceNameFormat": "argocd $(arguments)",
+    "inputs": [
+        {
+            "name": "connection",
+            "type": "connectedService:argocd",
+            "label": "Argo CD service connection",
+            "required": true,
+            "helpMarkDown": "The Argo CD server and token. Injected as ARGOCD_SERVER and ARGOCD_AUTH_TOKEN into the CLI process only."
+        },
+        {
+            "name": "arguments",
+            "type": "multiLine",
+            "label": "Arguments",
+            "defaultValue": "",
+            "required": true,
+            "helpMarkDown": "Arguments for a single `argocd` invocation, without the `argocd` command itself. Newlines are joined into one command line; a line starting with `#` is a comment. For several commands, use several steps.",
+            "properties": {
+                "resizable": "true",
+                "rows": "4"
+            }
+        },
+        {
+            "name": "workingDirectory",
+            "type": "filePath",
+            "label": "Working directory",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Directory to run in. Needed for commands that read local files, such as `app diff --local`."
+        },
+        {
+            "name": "grpcWeb",
+            "type": "boolean",
+            "label": "Use gRPC-Web",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "advanced",
+            "helpMarkDown": "Pass `--grpc-web`. Needed when the ingress in front of Argo CD does not support HTTP/2 end to end."
+        },
+        {
+            "name": "failOnNonZeroExit",
+            "type": "boolean",
+            "label": "Fail on non-zero exit code",
+            "defaultValue": "true",
+            "required": false,
+            "groupName": "advanced",
+            "helpMarkDown": "When off, a non-zero exit reports 'succeeded with issues' and the code is still published as an output variable."
+        },
+        {
+            "name": "failOnStderr",
+            "type": "boolean",
+            "label": "Fail on stderr output",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "advanced",
+            "helpMarkDown": "Fail if the CLI writes anything to stderr. Off by default: argocd writes progress and warnings there."
+        }
+    ],
+    "groups": [
+        {
+            "name": "advanced",
+            "displayName": "Advanced",
+            "isExpanded": false
+        }
+    ],
+    "outputVariables": [
+        {
+            "name": "argocdExitCode",
+            "description": "Exit code returned by the argocd command."
+        }
+    ],
+    "restrictions": {
+        "commands": {
+            "mode": "restricted"
+        },
+        "settableVariables": {
+            "allowed": [
+                "argocdExitCode"
+            ]
+        }
+    },
+    "execution": {
+        "Node20_1": {
+            "target": "index.js"
+        },
+        "Node24": {
+            "target": "index.js"
+        }
+    }
+}

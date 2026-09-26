@@ -1,0 +1,59 @@
+# Build, publish the image, update the GitOps repo, then let Argo CD converge.
+#
+# The sync runs inside a deployment job so the Environment gives you deployment history,
+# approvals and an exclusive lock for free -- none of which the task has to implement.
+trigger:
+  branches: { include: [main] }
+
+variables:
+  ARGOCD_CONNECTION: 'argocd-prod'
+  ARGOCD_PROJECT: 'payments'
+
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildImage
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - script: echo "docker build && docker push $(Build.BuildId)"
+            displayName: Build and push image
+
+  - stage: UpdateGitOps
+    dependsOn: Build
+    jobs:
+      - job: Commit
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - script: echo "update image tag to $(Build.BuildId) and push to the GitOps repo"
+            displayName: Update GitOps repository
+
+  - stage: Deploy
+    dependsOn: UpdateGitOps
+    jobs:
+      - deployment: SyncPayments
+        environment: 'payments-production'
+        pool: { vmImage: ubuntu-latest }
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: ArgoCDApp@1
+                  name: argocd
+                  displayName: Sync and wait
+                  inputs:
+                    connection: '$(ARGOCD_CONNECTION)'
+                    command: 'sync'
+                    applications: 'payments-api'
+                    project: '$(ARGOCD_PROJECT)'
+                    prune: true
+                    syncOptions: |
+                      CreateNamespace=true
+                      ServerSideApply=true
+                    wait: true
+                    waitFor: 'sync,health'
+                    timeoutSeconds: '900'
+                    # Another pipeline may already be syncing this app.
+                    onRunningOperation: 'wait'
+
+                - script: echo "Deployed $(argocd.revision) - $(argocd.appUrl)"
+                  displayName: Report what shipped

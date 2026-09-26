@@ -1,0 +1,42 @@
+# Show reviewers which Applications an ApplicationSet change would add or remove.
+#
+# `generate` renders the Applications WITHOUT persisting anything, so this is safe to run on
+# a pull request. It is not the same as `create` with dryRun: dryRun answers "what would this
+# ApplicationSet own?", generate answers "what would it produce?".
+trigger: none
+pr:
+  branches: { include: [main] }
+
+jobs:
+  - job: Preview
+    pool: { vmImage: ubuntu-latest }
+    steps:
+      # What the ApplicationSet in the cluster produces today.
+      - task: ArgoCDAppSet@1
+        name: before
+        displayName: Applications today
+        inputs:
+          connection: 'argocd-prod'
+          command: 'generate'
+          generateFrom: 'name'
+          name: 'payments-set'
+        # A new ApplicationSet does not exist in the cluster yet.
+        continueOnError: true
+
+      # What the manifest in this pull request would produce.
+      - task: ArgoCDAppSet@1
+        name: after
+        displayName: Applications after this change
+        inputs:
+          connection: 'argocd-prod'
+          command: 'generate'
+          generateFrom: 'file'
+          manifestFile: 'gitops/applicationsets/payments.yaml'
+          artifactName: 'generated-apps-preview'
+
+      - script: |
+          echo "Today:      $(before.generatedAppCount) application(s)"
+          echo "After:      $(after.generatedAppCount) application(s)"
+          echo ""
+          echo "$(after.generatedApps)" | jq -r '.[] | "  \(.name) -> \(.server)/\(.namespace)"'
+        displayName: Summarise the change

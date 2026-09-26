@@ -1,0 +1,89 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+    "id": "43977efd-bc42-4b80-abb6-8cee2455da7d",
+    "name": "ArgoCDInstall",
+    "friendlyName": "Install Argo CD CLI",
+    "description": "Download, verify and cache the argocd CLI, and add it to PATH.",
+    "helpMarkDown": "[Documentation](https://github.com/WayneGoosen/azdo-argocd-tasks) | [Report an issue](https://github.com/WayneGoosen/azdo-argocd-tasks/issues)\n\nThe tool cache only persists on self-hosted agents. On Microsoft-hosted agents this downloads roughly 250 MB every run, so prefer **ArgoCDApp@1** unless you need something the REST API cannot do.",
+    "category": "Tool",
+    "author": "WayneGoosen",
+    "version": {
+        "Major": 1,
+        "Minor": 0,
+        "Patch": 0
+    },
+    "minimumAgentVersion": "4.248.0",
+    "instanceNameFormat": "Install Argo CD CLI $(version)",
+    "inputs": [
+        {
+            "name": "version",
+            "type": "pickList",
+            "label": "Version",
+            "defaultValue": "server",
+            "required": false,
+            "options": {
+                "server": "server - match the Argo CD server (needs a service connection)",
+                "latest": "latest - newest GitHub release",
+                "vX.Y.Z": "explicit - type a version such as v3.5.3"
+            },
+            "properties": {
+                "EditableOptions": "True"
+            },
+            "helpMarkDown": "`server` guarantees the CLI matches the server you are talking to. Type an explicit version such as `v3.5.3` to pin."
+        },
+        {
+            "name": "connection",
+            "type": "connectedService:argocd",
+            "label": "Argo CD service connection",
+            "required": false,
+            "helpMarkDown": "Required when Version is `server`, or when Source is `server`. Not needed for `latest` or an explicit version."
+        },
+        {
+            "name": "source",
+            "type": "pickList",
+            "label": "Download from",
+            "defaultValue": "auto",
+            "required": false,
+            "options": {
+                "auto": "auto - the Argo CD server when it can serve this agent, otherwise GitHub",
+                "github": "github - always GitHub releases",
+                "server": "server - always the Argo CD server (Linux agents only)"
+            },
+            "helpMarkDown": "The Argo CD server re-serves its own binary, so it can only supply a **Linux** CLI matching its own architecture. Everything else comes from GitHub."
+        },
+        {
+            "name": "verifyChecksum",
+            "type": "boolean",
+            "label": "Verify SHA-256 checksum",
+            "defaultValue": "true",
+            "required": false,
+            "helpMarkDown": "Verify GitHub downloads against `cli_checksums.txt`. Leave on: it is the only thing that catches a truncated download. Does not apply to server downloads, which serve the server's own build."
+        }
+    ],
+    "outputVariables": [
+        {
+            "name": "argocdPath",
+            "description": "Full path to the argocd binary."
+        },
+        {
+            "name": "argocdVersion",
+            "description": "Version tag that was installed, e.g. v3.5.3."
+        }
+    ],
+    "restrictions": {
+        "settableVariables": {
+            "allowed": [
+                "argocdPath",
+                "argocdVersion"
+            ]
+        }
+    },
+    "execution": {
+        "Node20_1": {
+            "target": "index.js"
+        },
+        "Node24": {
+            "target": "index.js"
+        }
+    }
+}

@@ -1,0 +1,32 @@
+node_modules/
+dist/
+*.vsix
+*.tsbuildinfo
+
+# azure-pipelines-task-lib writes a vault key beside the cwd when there is no
+# Agent.TempDirectory, which happens whenever a test loads it outside an agent.
+.taskkey
+vss-extension.dev.effective.json
+
+.DS_Store
+.env
+.env.local
+
+.argocd-env
+
+# Local working notes and agent state.
+#
+# Scratch for whoever (or whatever) is working on the repo, not part of the project.
+# Same convention as azdo-tf-plan-viewer.
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+
+# Internal working documents: planning, lessons, and the architecture research that
+# started the project. Not part of the published site.
+internal/
+
+# MkDocs build output, and the screenshots staged into the docs tree at build time
+# (canonical copies live in marketplace/images/).
+site/
+docs/assets/images/

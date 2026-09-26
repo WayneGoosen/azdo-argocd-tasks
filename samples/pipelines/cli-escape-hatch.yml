@@ -1,0 +1,41 @@
+# Using the CLI for something the REST API cannot do.
+#
+# `app diff --local` compares the cluster against manifests in the working directory, which
+# has no REST equivalent -- the server cannot see your build agent's files. This is exactly
+# what ArgoCDInstall + ArgoCDCli are for.
+#
+# Note the cost: the argocd binary is ~250 MB and the tool cache only persists on self-hosted
+# agents. Prefer ArgoCDApp@1 wherever it covers what you need.
+trigger: none
+pr:
+  branches: { include: [main] }
+
+jobs:
+  - job: LocalDiff
+    pool: { vmImage: ubuntu-latest }
+    steps:
+      - task: ArgoCDInstall@1
+        name: installCli
+        displayName: Install the Argo CD CLI
+        inputs:
+          connection: 'argocd-prod'
+          # Match the server, so client and server never disagree about a feature.
+          version: 'server'
+
+      - script: echo "Installed $(installCli.argocdVersion) at $(installCli.argocdPath)"
+        displayName: Report the CLI version
+
+      - task: ArgoCDCli@1
+        name: localDiff
+        displayName: Diff the cluster against local manifests
+        inputs:
+          connection: 'argocd-prod'
+          arguments: |
+            app diff payments-api
+            --local ./manifests
+          workingDirectory: '$(Build.SourcesDirectory)'
+          # `argocd app diff` exits 1 when differences exist, which is not a failure here.
+          failOnNonZeroExit: false
+
+      - script: echo "argocd exited with $(localDiff.argocdExitCode)"
+        displayName: Report the diff outcome

@@ -1,0 +1,749 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+    "id": "432dec46-815a-45c9-85b7-cbd13782f6df",
+    "name": "ArgoCDApp",
+    "friendlyName": "Argo CD Application",
+    "description": "Get status, sync, wait, diff or refresh Argo CD applications over the Argo CD REST API.",
+    "helpMarkDown": "[Documentation](https://github.com/WayneGoosen/azdo-argocd-tasks) | [Report an issue](https://github.com/WayneGoosen/azdo-argocd-tasks/issues)",
+    "category": "Deploy",
+    "author": "WayneGoosen",
+    "version": {
+        "Major": 1,
+        "Minor": 0,
+        "Patch": 0
+    },
+    "minimumAgentVersion": "4.248.0",
+    "instanceNameFormat": "Argo CD $(command)",
+    "groups": [
+        {
+            "name": "sync",
+            "displayName": "Sync options",
+            "isExpanded": true,
+            "visibleRule": "command = sync"
+        },
+        {
+            "name": "waiting",
+            "displayName": "Wait options",
+            "isExpanded": true,
+            "visibleRule": "command = sync || command = wait || command = rollback"
+        },
+        {
+            "name": "status",
+            "displayName": "Status options",
+            "isExpanded": true,
+            "visibleRule": "command = get || command = refresh"
+        },
+        {
+            "name": "rollback",
+            "displayName": "Rollback options",
+            "isExpanded": true,
+            "visibleRule": "command = rollback"
+        },
+        {
+            "name": "action",
+            "displayName": "Action options",
+            "isExpanded": true,
+            "visibleRule": "command = action"
+        },
+        {
+            "name": "output",
+            "displayName": "Manifest and log options",
+            "isExpanded": true,
+            "visibleRule": "command = manifests || command = logs"
+        },
+        {
+            "name": "diff",
+            "displayName": "Diff options",
+            "isExpanded": true,
+            "visibleRule": "command = diff"
+        },
+        {
+            "name": "advanced",
+            "displayName": "Advanced",
+            "isExpanded": false
+        },
+        {
+            "name": "create",
+            "displayName": "Create options",
+            "isExpanded": true,
+            "visibleRule": "command = create"
+        },
+        {
+            "name": "specEdit",
+            "displayName": "Spec fields",
+            "isExpanded": true,
+            "visibleRule": "command = set || command = unset"
+        },
+        {
+            "name": "delete",
+            "displayName": "Delete options",
+            "isExpanded": true,
+            "visibleRule": "command = delete"
+        }
+    ],
+    "inputs": [
+        {
+            "name": "connection",
+            "type": "connectedService:argocd",
+            "label": "Argo CD service connection",
+            "required": true,
+            "helpMarkDown": "The Argo CD server and token to use. Prefer a project role token scoped to a single AppProject."
+        },
+        {
+            "name": "command",
+            "type": "pickList",
+            "label": "Command",
+            "defaultValue": "sync",
+            "required": true,
+            "options": {
+                "get": "get - report sync and health status",
+                "sync": "sync - sync and optionally wait",
+                "wait": "wait - wait for a condition",
+                "diff": "diff - show desired vs live state",
+                "refresh": "refresh - refresh from Git, then report status",
+                "history": "history - list deployment history",
+                "rollback": "rollback - roll back to a previous revision",
+                "action": "action - run a resource action (e.g. restart)",
+                "manifests": "manifests - render desired or live manifests",
+                "logs": "logs - collect pod logs",
+                "terminate": "terminate - cancel an in-flight operation",
+                "create": "create - create or upsert from a manifest file",
+                "set": "set - change deployment fields on the live spec",
+                "unset": "unset - remove them again",
+                "delete": "delete - delete applications (guarded)"
+            },
+            "helpMarkDown": "Which Argo CD application operation to run."
+        },
+        {
+            "name": "applications",
+            "type": "multiLine",
+            "label": "Applications",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "One application per line. Use `name` or `namespace/name` for applications in any namespace. Leave empty when using a selector.",
+            "properties": {
+                "resizable": "true",
+                "rows": "3"
+            }
+        },
+        {
+            "name": "selector",
+            "type": "string",
+            "label": "Label selector",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Kubernetes label selector matching several applications, e.g. `app.kubernetes.io/instance=my-app`. Used when Applications is empty."
+        },
+        {
+            "name": "project",
+            "type": "string",
+            "label": "Project",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "The AppProject the applications belong to. **Strongly recommended**: without it Argo CD reports a missing application and an RBAC denial identically, as 'permission denied'."
+        },
+        {
+            "name": "appNamespace",
+            "type": "string",
+            "label": "Application namespace",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Namespace holding the Application resources, for app-in-any-namespace installs. Defaults to the Argo CD control plane namespace."
+        },
+        {
+            "name": "resource",
+            "type": "string",
+            "label": "Resource",
+            "defaultValue": "",
+            "required": false,
+            "helpMarkDown": "Target resource as `KIND:NAME`, `GROUP:KIND:NAME` or `GROUP:KIND:NAME:NAMESPACE`, for example `apps:Deployment:payments-api`. Required for `action`; optional for `logs`, where omitting it streams every pod in the application.",
+            "visibleRule": "command = action || command = logs"
+        },
+        {
+            "name": "revision",
+            "type": "string",
+            "label": "Revision",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "sync",
+            "helpMarkDown": "Git revision, tag or Helm chart version to sync to. Defaults to the application's target revision."
+        },
+        {
+            "name": "prune",
+            "type": "boolean",
+            "label": "Prune resources removed from Git",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "sync"
+        },
+        {
+            "name": "dryRun",
+            "type": "boolean",
+            "label": "Dry run",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "sync",
+            "helpMarkDown": "Preview the sync without applying it. Waiting is skipped automatically for a dry run."
+        },
+        {
+            "name": "syncStrategy",
+            "type": "pickList",
+            "label": "Sync strategy",
+            "defaultValue": "apply",
+            "required": false,
+            "groupName": "sync",
+            "options": {
+                "apply": "apply",
+                "hook": "hook"
+            }
+        },
+        {
+            "name": "force",
+            "type": "boolean",
+            "label": "Force",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "sync",
+            "helpMarkDown": "Use `kubectl apply --force`. Replaces resources that cannot be patched."
+        },
+        {
+            "name": "resources",
+            "type": "multiLine",
+            "label": "Resources",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "sync",
+            "helpMarkDown": "Sync only these resources, one per line, as `KIND:NAME`, `GROUP:KIND:NAME` or `GROUP:KIND:NAME:NAMESPACE`.",
+            "properties": {
+                "resizable": "true",
+                "rows": "3"
+            }
+        },
+        {
+            "name": "syncOptions",
+            "type": "multiLine",
+            "label": "Sync options",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "sync",
+            "helpMarkDown": "One option per line, e.g. `CreateNamespace=true`, `ServerSideApply=true`, `Replace=true`.",
+            "properties": {
+                "resizable": "true",
+                "rows": "3"
+            }
+        },
+        {
+            "name": "retryLimit",
+            "type": "string",
+            "label": "Retry limit",
+            "defaultValue": "0",
+            "required": false,
+            "groupName": "sync",
+            "helpMarkDown": "How many times Argo CD itself retries a failed sync. 0 disables retries.",
+            "properties": {
+                "isVariableOrNonNegativeNumber": "true"
+            }
+        },
+        {
+            "name": "onRunningOperation",
+            "type": "pickList",
+            "label": "If an operation is already running",
+            "defaultValue": "fail",
+            "required": false,
+            "groupName": "sync",
+            "options": {
+                "fail": "fail - stop with an error",
+                "wait": "wait - wait for it to finish, then sync",
+                "terminate": "terminate - cancel it, then sync"
+            }
+        },
+        {
+            "name": "wait",
+            "type": "boolean",
+            "label": "Wait for the sync to converge",
+            "defaultValue": "true",
+            "required": false,
+            "groupName": "waiting",
+            "visibleRule": "command = sync"
+        },
+        {
+            "name": "waitFor",
+            "type": "pickList",
+            "label": "Wait for",
+            "defaultValue": "sync,health",
+            "required": false,
+            "groupName": "waiting",
+            "options": {
+                "sync,health": "Synced and Healthy",
+                "sync": "Synced",
+                "health": "Healthy",
+                "operation": "Operation finished",
+                "suspended": "Suspended (Argo Rollouts pause)"
+            },
+            "properties": {
+                "EditableOptions": "True"
+            },
+            "helpMarkDown": "Comma-separated conditions that must all hold: `sync`, `health`, `operation`, `suspended`."
+        },
+        {
+            "name": "timeoutSeconds",
+            "type": "string",
+            "label": "Timeout (seconds)",
+            "defaultValue": "600",
+            "required": false,
+            "groupName": "waiting",
+            "properties": {
+                "isVariableOrNonNegativeNumber": "true"
+            }
+        },
+        {
+            "name": "failOnTimeout",
+            "type": "boolean",
+            "label": "Fail the task on timeout",
+            "defaultValue": "true",
+            "required": false,
+            "groupName": "waiting",
+            "helpMarkDown": "When off, a timeout reports 'succeeded with issues' instead of failing."
+        },
+        {
+            "name": "pollIntervalSeconds",
+            "type": "string",
+            "label": "Poll interval (seconds)",
+            "defaultValue": "5",
+            "required": false,
+            "groupName": "waiting",
+            "properties": {
+                "isVariableOrNonNegativeNumber": "true"
+            }
+        },
+        {
+            "name": "refresh",
+            "type": "pickList",
+            "label": "Refresh",
+            "defaultValue": "none",
+            "required": false,
+            "groupName": "status",
+            "visibleRule": "command = get",
+            "options": {
+                "none": "none",
+                "normal": "normal",
+                "hard": "hard - also regenerate manifests"
+            },
+            "helpMarkDown": "A refresh blocks until the Argo CD controller has reconciled, so it can take noticeably longer than a plain read."
+        },
+        {
+            "name": "hard",
+            "type": "boolean",
+            "label": "Hard refresh",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "status",
+            "visibleRule": "command = refresh",
+            "helpMarkDown": "Also regenerate manifests from the source repository, ignoring the manifest cache."
+        },
+        {
+            "name": "failOnHealth",
+            "type": "string",
+            "label": "Fail on health statuses",
+            "defaultValue": "Degraded,Missing",
+            "required": false,
+            "groupName": "status",
+            "helpMarkDown": "Comma-separated health statuses that fail the task."
+        },
+        {
+            "name": "failOnOutOfSync",
+            "type": "boolean",
+            "label": "Fail when out of sync",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "status",
+            "helpMarkDown": "When off, an out-of-sync application reports 'succeeded with issues'."
+        },
+        {
+            "name": "failOnDiff",
+            "type": "boolean",
+            "label": "Fail when differences are found",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "diff",
+            "helpMarkDown": "When off, differences report 'succeeded with issues'. Useful as a pull request gate."
+        },
+        {
+            "name": "publishSummary",
+            "type": "boolean",
+            "label": "Publish a run summary",
+            "defaultValue": "true",
+            "required": false,
+            "groupName": "advanced",
+            "helpMarkDown": "Publish an application table, unhealthy resources and any diff to the pipeline run summary."
+        },
+        {
+            "name": "historyId",
+            "type": "string",
+            "label": "History ID",
+            "defaultValue": "previous",
+            "required": false,
+            "groupName": "rollback",
+            "helpMarkDown": "History ID to roll back to, or `previous` for the deployment before the current one. Run the `history` command to list IDs."
+        },
+        {
+            "name": "action",
+            "type": "string",
+            "label": "Action",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "action",
+            "helpMarkDown": "Action to run, for example `restart`. **Leave empty to list the actions available on the resource.**"
+        },
+        {
+            "name": "actionParameters",
+            "type": "multiLine",
+            "label": "Action parameters",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "action",
+            "properties": {
+                "resizable": "true",
+                "rows": "3"
+            },
+            "helpMarkDown": "One `name=value` per line. Argo CD exposes only parameter names, so values are passed through as strings."
+        },
+        {
+            "name": "manifestSource",
+            "type": "pickList",
+            "label": "Manifest source",
+            "defaultValue": "git",
+            "required": false,
+            "groupName": "output",
+            "visibleRule": "command = manifests",
+            "options": {
+                "git": "git - desired state rendered from the source",
+                "live": "live - current state in the cluster"
+            },
+            "helpMarkDown": "Note a revision can only be rendered from `git`; live state has no revision to select."
+        },
+        {
+            "name": "podName",
+            "type": "string",
+            "label": "Pod name",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "output",
+            "visibleRule": "command = logs",
+            "helpMarkDown": "Read logs from one pod. Leave empty to stream every pod in the application, interleaved."
+        },
+        {
+            "name": "container",
+            "type": "string",
+            "label": "Container",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "output",
+            "visibleRule": "command = logs"
+        },
+        {
+            "name": "tailLines",
+            "type": "string",
+            "label": "Tail lines",
+            "defaultValue": "1000",
+            "required": false,
+            "groupName": "output",
+            "visibleRule": "command = logs",
+            "properties": {
+                "isVariableOrNonNegativeNumber": "true"
+            },
+            "helpMarkDown": "Lines to read from the end of each stream. Applied per pod, not overall."
+        },
+        {
+            "name": "sinceSeconds",
+            "type": "string",
+            "label": "Since (seconds)",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "output",
+            "visibleRule": "command = logs",
+            "properties": {
+                "isVariableOrNonNegativeNumber": "true"
+            }
+        },
+        {
+            "name": "previous",
+            "type": "boolean",
+            "label": "Previous container instance",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "output",
+            "visibleRule": "command = logs",
+            "helpMarkDown": "Read logs from the previous instance of the container, for diagnosing a crash loop."
+        },
+        {
+            "name": "logFilter",
+            "type": "string",
+            "label": "Filter",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "output",
+            "visibleRule": "command = logs",
+            "helpMarkDown": "Only lines containing this text. Prefix with `!` to invert the match."
+        },
+        {
+            "name": "artifactName",
+            "type": "string",
+            "label": "Artifact name",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "output",
+            "helpMarkDown": "Name of the published pipeline artifact. Defaults to `argocd-manifests` or `argocd-logs`."
+        },
+        {
+            "name": "manifestFile",
+            "type": "filePath",
+            "label": "Manifest file",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "create",
+            "helpMarkDown": "Path to an Application manifest. YAML or JSON; multi-document YAML is supported, so an app-of-apps bootstrap file works in one step."
+        },
+        {
+            "name": "upsert",
+            "type": "boolean",
+            "label": "Upsert",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "create",
+            "helpMarkDown": "Update the application if it already exists. Note this additionally requires `update` RBAC, not just `create`."
+        },
+        {
+            "name": "validate",
+            "type": "boolean",
+            "label": "Validate",
+            "defaultValue": "true",
+            "required": false,
+            "groupName": "create",
+            "visibleRule": "command = create || command = set || command = unset",
+            "helpMarkDown": "Ask Argo CD to validate the application against its repository and destination before storing it."
+        },
+        {
+            "name": "helmParameters",
+            "type": "multiLine",
+            "label": "Helm parameters",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "specEdit",
+            "properties": {
+                "resizable": "true",
+                "rows": "3"
+            },
+            "helpMarkDown": "One `name=value` per line; existing parameters with the same name are replaced. For **unset**, pass names only."
+        },
+        {
+            "name": "helmStringParameters",
+            "type": "multiLine",
+            "label": "Helm string parameters",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "specEdit",
+            "properties": {
+                "resizable": "true",
+                "rows": "2"
+            },
+            "helpMarkDown": "As above, but forces the value to be treated as a string (`--helm-set-string`)."
+        },
+        {
+            "name": "helmValueFiles",
+            "type": "multiLine",
+            "label": "Helm value files",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "specEdit",
+            "properties": {
+                "resizable": "true",
+                "rows": "2"
+            },
+            "helpMarkDown": "One per line. **Replaces the whole list** rather than appending, matching `argocd app set --values`. For **unset**, the listed files are removed."
+        },
+        {
+            "name": "kustomizeImages",
+            "type": "multiLine",
+            "label": "Kustomize images",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "specEdit",
+            "properties": {
+                "resizable": "true",
+                "rows": "2"
+            },
+            "helpMarkDown": "One per line as `name:tag`, `old=new:tag` or `name@sha256:...`. Images sharing a name replace one another. For **unset**, pass names only."
+        },
+        {
+            "name": "targetRevision",
+            "type": "string",
+            "label": "Target revision",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "specEdit",
+            "visibleRule": "command = set",
+            "helpMarkDown": "Pin the source to a branch, tag, commit or chart version."
+        },
+        {
+            "name": "sourcePosition",
+            "type": "string",
+            "label": "Source position",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "specEdit",
+            "properties": {
+                "isVariableOrNonNegativeNumber": "true"
+            },
+            "helpMarkDown": "For multi-source applications, which source to edit, **numbered from 1**. Required when an application has more than one source."
+        },
+        {
+            "name": "confirm",
+            "type": "boolean",
+            "label": "Confirm deletion",
+            "defaultValue": "false",
+            "required": false,
+            "groupName": "delete",
+            "helpMarkDown": "**Required.** Deleting an Argo CD application also deletes the resources it manages. Label selectors are not accepted for delete \u2014 name each application explicitly."
+        },
+        {
+            "name": "cascade",
+            "type": "boolean",
+            "label": "Cascade",
+            "defaultValue": "true",
+            "required": false,
+            "groupName": "delete",
+            "helpMarkDown": "Also delete the resources the application manages. Turning this off leaves them running."
+        },
+        {
+            "name": "propagationPolicy",
+            "type": "pickList",
+            "label": "Propagation policy",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "delete",
+            "options": {
+                "": "default",
+                "foreground": "foreground",
+                "background": "background"
+            },
+            "helpMarkDown": "Kubernetes deletion propagation. Cannot be combined with cascade disabled."
+        }
+    ],
+    "outputVariables": [
+        {
+            "name": "syncStatus",
+            "description": "Sync status of the application (single-application runs)."
+        },
+        {
+            "name": "healthStatus",
+            "description": "Health status of the application (single-application runs)."
+        },
+        {
+            "name": "revision",
+            "description": "Revision the application is running."
+        },
+        {
+            "name": "operationPhase",
+            "description": "Phase of the most recent operation."
+        },
+        {
+            "name": "operationMessage",
+            "description": "Message from the most recent operation."
+        },
+        {
+            "name": "appUrl",
+            "description": "Deep link to the application in the Argo CD UI."
+        },
+        {
+            "name": "appsJson",
+            "description": "JSON array of every application acted on, with sync, health and revision."
+        },
+        {
+            "name": "hasDiff",
+            "description": "true when the diff command found differences."
+        },
+        {
+            "name": "diffResourceCount",
+            "description": "Number of resources that differ from the desired state."
+        },
+        {
+            "name": "latestHistoryId",
+            "description": "Newest deployment history ID (history command)."
+        },
+        {
+            "name": "rolledBackTo",
+            "description": "History ID the application was rolled back to."
+        },
+        {
+            "name": "availableActions",
+            "description": "Comma-separated resource actions available (action command with no action set)."
+        },
+        {
+            "name": "manifestCount",
+            "description": "Number of manifests rendered."
+        },
+        {
+            "name": "manifestFile",
+            "description": "Path to the rendered manifest file."
+        },
+        {
+            "name": "logLineCount",
+            "description": "Number of log lines collected."
+        },
+        {
+            "name": "logFile",
+            "description": "Path to the collected log file."
+        },
+        {
+            "name": "terminatedCount",
+            "description": "Number of operations terminated."
+        },
+        {
+            "name": "appName",
+            "description": "Name of the application created (single-application create)."
+        },
+        {
+            "name": "createdCount",
+            "description": "Number of applications created or upserted."
+        },
+        {
+            "name": "deletedCount",
+            "description": "Number of applications whose deletion was requested."
+        }
+    ],
+    "execution": {
+        "Node20_1": {
+            "target": "index.js"
+        },
+        "Node24": {
+            "target": "index.js"
+        }
+    },
+    "restrictions": {
+        "settableVariables": {
+            "allowed": [
+                "syncStatus",
+                "healthStatus",
+                "revision",
+                "operationPhase",
+                "operationMessage",
+                "appUrl",
+                "appsJson",
+                "hasDiff",
+                "diffResourceCount",
+                "latestHistoryId",
+                "rolledBackTo",
+                "availableActions",
+                "manifestCount",
+                "manifestFile",
+                "logLineCount",
+                "logFile",
+                "terminatedCount",
+                "appName",
+                "createdCount",
+                "deletedCount"
+            ]
+        }
+    }
+}

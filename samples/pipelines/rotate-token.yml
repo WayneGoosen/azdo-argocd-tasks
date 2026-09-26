@@ -1,0 +1,126 @@
+# Rotate the Argo CD token in a service connection.
+#
+# Read https://waynegoosen.github.io/azdo-argocd-tasks/token-rotation/ before running this: it changes a credential your other
+# pipelines depend on.
+#
+# The order matters. Mint, update, VERIFY, then revoke. Revoking before verifying means a
+# failed update leaves you with no working credential at all.
+#
+# This pipeline authenticates with a SEPARATE rotation connection whose token may only
+# manage tokens -- not sync, read or delete. That one you rotate by hand, rarely.
+trigger: none
+
+schedules:
+  - cron: '0 3 1 */1 *' # 03:00 on the 1st of each month
+    displayName: Monthly token rotation
+    branches: { include: [main] }
+    always: true
+
+variables:
+  ROTATION_CONNECTION: 'argocd-rotation' # may only manage tokens
+  TARGET_CONNECTION_NAME: 'argocd-prod' # the connection being rotated
+  ARGOCD_PROJECT: 'payments'
+  ARGOCD_ROLE: 'ado-ci'
+  TOKEN_LIFETIME: '90d'
+
+jobs:
+  - job: Rotate
+    pool: { vmImage: ubuntu-latest }
+    steps:
+      # 1. Record the tokens that exist now, so we know what to revoke afterwards.
+      - task: ArgoCDProject@1
+        name: before
+        displayName: List existing tokens
+        inputs:
+          connection: '$(ROTATION_CONNECTION)'
+          command: 'list-tokens'
+          project: '$(ARGOCD_PROJECT)'
+          role: '$(ARGOCD_ROLE)'
+
+      # 2. Mint the replacement. The value is a secret output variable and is only
+      #    retrievable here -- Argo CD does not store it.
+      - task: ArgoCDProject@1
+        name: mint
+        displayName: Mint a new token
+        inputs:
+          connection: '$(ROTATION_CONNECTION)'
+          command: 'create-token'
+          project: '$(ARGOCD_PROJECT)'
+          role: '$(ARGOCD_ROLE)'
+          expiresIn: '$(TOKEN_LIFETIME)'
+
+      # 3. Write it into the target service connection.
+      #
+      #    This is an Azure DevOps API call, not an Argo CD one, which is why it is a script
+      #    rather than a task. The endpoint is a FULL REPLACE: read the endpoint, change one
+      #    field, put the whole object back.
+      #
+      #    The build service account needs Administrator on the target connection.
+      - task: AzureCLI@2
+        name: update
+        displayName: Update the service connection
+        env:
+          NEW_TOKEN: $(mint.token) # secret vars must be mapped explicitly
+        inputs:
+          azureSubscription: 'azure-devops-admin' # an ARM connection with a PAT-less identity
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+
+            ORG_URL="$(System.TeamFoundationCollectionUri)"
+            PROJECT="$(System.TeamProject)"
+            API="api-version=7.1"
+
+            ENDPOINT_ID=$(az devops service-endpoint list \
+              --org "$ORG_URL" --project "$PROJECT" \
+              --query "[?name=='$(TARGET_CONNECTION_NAME)'].id | [0]" -o tsv)
+
+            if [ -z "$ENDPOINT_ID" ]; then
+              echo "##vso[task.logissue type=error]No service connection named $(TARGET_CONNECTION_NAME)"
+              exit 1
+            fi
+
+            # Full replace: fetch, patch one field, put it all back.
+            az devops invoke \
+              --org "$ORG_URL" --area serviceendpoint --resource endpoints \
+              --route-parameters project="$PROJECT" endpointId="$ENDPOINT_ID" \
+              --api-version 7.1 --http-method GET > endpoint.json
+
+            jq --arg t "$NEW_TOKEN" '.authorization.parameters.apitoken = $t' endpoint.json > updated.json
+
+            az devops invoke \
+              --org "$ORG_URL" --area serviceendpoint --resource endpoints \
+              --route-parameters project="$PROJECT" endpointId="$ENDPOINT_ID" \
+              --api-version 7.1 --http-method PUT --in-file updated.json > /dev/null
+
+            echo "Updated service connection $(TARGET_CONNECTION_NAME)"
+
+      # 4. Prove the new token actually works BEFORE revoking anything. If this fails, the
+      #    old token is still valid and nothing is broken.
+      - task: ArgoCDAccount@1
+        displayName: Verify the new token
+        inputs:
+          connection: '$(TARGET_CONNECTION_NAME)'
+          command: 'can-i'
+          resource: 'applications'
+          action: 'sync'
+          subresource: '$(ARGOCD_PROJECT)/*'
+          failIfDenied: true
+
+      # 5. Only now revoke the tokens that existed before this run.
+      - task: ArgoCDProject@1
+        displayName: Revoke the previous tokens
+        condition: succeeded()
+        inputs:
+          connection: '$(ROTATION_CONNECTION)'
+          command: 'delete-token'
+          project: '$(ARGOCD_PROJECT)'
+          role: '$(ARGOCD_ROLE)'
+          # For several old tokens, loop this step over before.tokenIds.
+          tokenId: '$(before.tokenIds)'
+
+      - script: |
+          echo "Rotated $(ARGOCD_PROJECT):$(ARGOCD_ROLE)"
+          echo "New token id: $(mint.tokenId)"
+        displayName: Report

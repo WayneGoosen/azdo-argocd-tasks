@@ -1,0 +1,59 @@
+# Publish a private dev build and share it with a test organisation.
+#
+# WARNING: the dev extension reuses the production task GUID. Install it in an organisation
+# that does NOT have the public extension installed, or the two task registrations collide
+# and pipelines resolve the wrong one.
+name: Dev publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      share_with:
+        description: 'Azure DevOps organisation to share the dev build with'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: marketplace
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Build dev overrides
+        run: |
+          set -euo pipefail
+          # A run-number version keeps dev builds monotonic without touching GitVersion.
+          jq --arg v "0.0.${{ github.run_number }}" '. + {version: $v}' \
+            vss-extension.dev.json > vss-extension.dev.effective.json
+          cat vss-extension.dev.effective.json
+
+      - run: node scripts/build.mjs
+
+      - name: Install tfx
+        run: npm i -g tfx-cli@^0.24.2
+
+      - name: Publish and share
+        env:
+          TFX_TOKEN: ${{ secrets.ADO_PUBLISHER_PAT }}
+        run: |
+          set -euo pipefail
+          tfx extension publish \
+            --manifest-globs vss-extension.json \
+            --overrides-file vss-extension.dev.effective.json \
+            --share-with "${{ inputs.share_with }}" \
+            --token "$TFX_TOKEN" \
+            --no-color

@@ -1,0 +1,67 @@
+# Build and cut a GitHub release on every push to main.
+#
+# This does NOT publish to the Marketplace. Publishing is a separate, deliberate
+# workflow_dispatch, because a Marketplace version cannot be replaced once it exists.
+name: Main
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'samples/**'
+      - '.github/workflows/pr.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gittools/actions/gitversion/setup@v4.0.1
+        with:
+          versionSpec: '6.x'
+
+      - id: gitversion
+        uses: gittools/actions/gitversion/execute@v4.0.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Stamp version into the manifest and every task.json
+        run: node scripts/stamp-version.mjs "${{ steps.gitversion.outputs.majorMinorPatch }}"
+
+      - run: npm run package
+
+      - name: Verify VSIX marketplace assets
+        run: |
+          set -euo pipefail
+          VSIX=$(ls dist/*.vsix)
+          MANIFEST=$(unzip -p "$VSIX" extension.vsixmanifest)
+          fail=0
+          for asset in Microsoft.VisualStudio.Services.Content.Details \
+                       Microsoft.VisualStudio.Services.Icons.Default; do
+            grep -q "$asset" <<<"$MANIFEST" || { echo "::error::Missing asset entry $asset"; fail=1; }
+          done
+          exit $fail
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.gitversion.outputs.majorMinorPatch }}"
+          gh release create "v$VERSION" dist/*.vsix --generate-notes --title "v$VERSION"

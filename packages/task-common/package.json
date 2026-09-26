@@ -1,0 +1,15 @@
+{
+    "name": "@azdo-argocd/task-common",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Shared runtime for the Argo CD pipeline tasks",
+    "license": "Apache-2.0",
+    "main": "src/index.ts",
+    "types": "src/index.ts",
+    "dependencies": {
+        "@azdo-argocd/argocd-client": "*",
+        "azure-pipelines-task-lib": "^5.280.3",
+        "js-yaml": "^4.3.2"
+    },
+    "sideEffects": false
+}

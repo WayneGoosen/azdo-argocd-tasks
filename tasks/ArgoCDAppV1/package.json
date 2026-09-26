@@ -1,0 +1,13 @@
+{
+    "name": "@azdo-argocd/task-argocd-app-v1",
+    "version": "0.0.0",
+    "private": true,
+    "description": "ArgoCDApp@1 pipeline task",
+    "license": "Apache-2.0",
+    "main": "index.ts",
+    "dependencies": {
+        "@azdo-argocd/argocd-client": "*",
+        "@azdo-argocd/task-common": "*",
+        "azure-pipelines-task-lib": "^5.280.3"
+    }
+}

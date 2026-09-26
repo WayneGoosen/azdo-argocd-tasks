@@ -1,0 +1,15 @@
+{
+    "name": "@azdo-argocd/cli-runner",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Download, cache and invoke the argocd CLI",
+    "license": "Apache-2.0",
+    "main": "src/index.ts",
+    "types": "src/index.ts",
+    "dependencies": {
+        "@azdo-argocd/argocd-client": "*",
+        "azure-pipelines-task-lib": "^5.280.3",
+        "azure-pipelines-tool-lib": "^2.281.0"
+    },
+    "sideEffects": false
+}

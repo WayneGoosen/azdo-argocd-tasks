@@ -1,0 +1,71 @@
+site_name: Argo CD Pipeline Tasks
+site_description: Azure Pipelines tasks for Argo CD — sync, wait, diff and roll back over the REST API, with nothing to download.
+site_url: https://waynegoosen.github.io/azdo-argocd-tasks/
+repo_name: WayneGoosen/azdo-argocd-tasks
+repo_url: https://github.com/WayneGoosen/azdo-argocd-tasks
+edit_uri: edit/main/docs/
+copyright: Released under the Apache-2.0 License. Argo and Argo CD are trademarks of The Linux Foundation.
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    # Light / dark toggle
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+
+# Keep the build-tooling file out of the published site.
+exclude_docs: |
+  requirements.txt
+
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - Task inputs: task-inputs.md
+  - Security: security.md
+  - Token rotation: token-rotation.md
+  - Zero-secret auth (research): dex-token-exchange.md

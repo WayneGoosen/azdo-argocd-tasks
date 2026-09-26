@@ -1,0 +1,195 @@
+{
+    "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+    "id": "4df35b0e-0838-41e2-904b-ddf54b4c888e",
+    "name": "ArgoCDAppSet",
+    "friendlyName": "Argo CD ApplicationSet",
+    "description": "Manage Argo CD ApplicationSets, and preview the Applications they generate.",
+    "helpMarkDown": "[Documentation](https://github.com/WayneGoosen/azdo-argocd-tasks) | [Report an issue](https://github.com/WayneGoosen/azdo-argocd-tasks/issues)\n\nUse **generate** in a pull request to show which Applications a change would add or remove.",
+    "category": "Deploy",
+    "author": "WayneGoosen",
+    "version": {
+        "Major": 1,
+        "Minor": 0,
+        "Patch": 0
+    },
+    "minimumAgentVersion": "4.248.0",
+    "instanceNameFormat": "Argo CD appset $(command)",
+    "groups": [
+        {
+            "name": "advanced",
+            "displayName": "Advanced",
+            "isExpanded": false
+        }
+    ],
+    "inputs": [
+        {
+            "name": "connection",
+            "type": "connectedService:argocd",
+            "label": "Argo CD service connection",
+            "required": true
+        },
+        {
+            "name": "command",
+            "type": "pickList",
+            "label": "Command",
+            "defaultValue": "list",
+            "required": true,
+            "options": {
+                "list": "list - list ApplicationSets",
+                "get": "get - read one ApplicationSet",
+                "generate": "generate - preview the Applications it would produce",
+                "create": "create - create or upsert from a manifest file",
+                "delete": "delete - delete ApplicationSets (guarded)"
+            }
+        },
+        {
+            "name": "name",
+            "type": "multiLine",
+            "label": "Name",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command = get || command = delete || command = generate",
+            "properties": {
+                "resizable": "true",
+                "rows": "2"
+            },
+            "helpMarkDown": "ApplicationSet name. For **delete**, one per line; label selectors are not accepted."
+        },
+        {
+            "name": "manifestFile",
+            "type": "filePath",
+            "label": "Manifest file",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command = create || command = generate",
+            "helpMarkDown": "Path to an ApplicationSet manifest. YAML or JSON; multi-document YAML is supported for **create**."
+        },
+        {
+            "name": "generateFrom",
+            "type": "pickList",
+            "label": "Generate from",
+            "defaultValue": "file",
+            "required": false,
+            "visibleRule": "command = generate",
+            "options": {
+                "file": "file - a manifest in the repository",
+                "name": "name - the ApplicationSet currently in the cluster"
+            },
+            "helpMarkDown": "Preview a manifest before merging it, or preview what the live ApplicationSet would produce right now."
+        },
+        {
+            "name": "upsert",
+            "type": "boolean",
+            "label": "Upsert",
+            "defaultValue": "false",
+            "required": false,
+            "visibleRule": "command = create",
+            "helpMarkDown": "Update the ApplicationSet if it already exists. This additionally requires `update` RBAC, not just `create`."
+        },
+        {
+            "name": "dryRun",
+            "type": "boolean",
+            "label": "Dry run",
+            "defaultValue": "false",
+            "required": false,
+            "visibleRule": "command = create",
+            "helpMarkDown": "Validate without persisting, reporting what the ApplicationSet **would own**. To see the Applications it would **produce**, use the `generate` command instead."
+        },
+        {
+            "name": "projects",
+            "type": "multiLine",
+            "label": "Projects",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command = list",
+            "properties": {
+                "resizable": "true",
+                "rows": "2"
+            },
+            "helpMarkDown": "Limit to these projects, one per line."
+        },
+        {
+            "name": "selector",
+            "type": "string",
+            "label": "Label selector",
+            "defaultValue": "",
+            "required": false,
+            "visibleRule": "command = list",
+            "helpMarkDown": "Kubernetes label selector. Not accepted for delete."
+        },
+        {
+            "name": "confirm",
+            "type": "boolean",
+            "label": "Confirm deletion",
+            "defaultValue": "false",
+            "required": false,
+            "visibleRule": "command = delete",
+            "helpMarkDown": "**Required for delete.** Deleting an ApplicationSet also deletes every Application it generated, unless `preserveResourcesOnDeletion` is set on the ApplicationSet."
+        },
+        {
+            "name": "appsetNamespace",
+            "type": "string",
+            "label": "ApplicationSet namespace",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "advanced",
+            "helpMarkDown": "Namespace holding the ApplicationSet, for appsets-in-any-namespace installs."
+        },
+        {
+            "name": "artifactName",
+            "type": "string",
+            "label": "Artifact name",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "advanced",
+            "visibleRule": "command = generate",
+            "helpMarkDown": "Name of the published artifact carrying the full generated Applications. Defaults to `argocd-generated-apps`."
+        }
+    ],
+    "outputVariables": [
+        {
+            "name": "appSetCount",
+            "description": "Number of ApplicationSets listed or created."
+        },
+        {
+            "name": "appSetNames",
+            "description": "Comma-separated ApplicationSet names."
+        },
+        {
+            "name": "generatedAppCount",
+            "description": "Number of Applications generated."
+        },
+        {
+            "name": "generatedApps",
+            "description": "Compact JSON array of generated Applications: name, namespace, project, server."
+        },
+        {
+            "name": "generatedAppsFile",
+            "description": "Path to the full generated Application objects."
+        },
+        {
+            "name": "deletedCount",
+            "description": "Number of ApplicationSets whose deletion was requested."
+        }
+    ],
+    "execution": {
+        "Node20_1": {
+            "target": "index.js"
+        },
+        "Node24": {
+            "target": "index.js"
+        }
+    },
+    "restrictions": {
+        "settableVariables": {
+            "allowed": [
+                "appSetCount",
+                "appSetNames",
+                "generatedAppCount",
+                "generatedApps",
+                "generatedAppsFile",
+                "deletedCount"
+            ]
+        }
+    }
+}

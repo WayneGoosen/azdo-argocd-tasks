@@ -1,0 +1,25 @@
+# Versioning for the extension and every task.json.
+#
+# Two rules that bite if forgotten:
+#   1. GitVersion needs a tag anchor (git tag vX.Y.Z) and checkout fetch-depth: 0,
+#      or it counts from repo init and produces absurd version numbers.
+#   2. A MAJOR bump is a breaking change for consumers: it rewrites the
+#      `ArgoCDApp@N` reference in every pipeline that uses this extension.
+#      Bump major only deliberately, and sweep README / marketplace/overview.md
+#      / samples/ for the old @N when you do.
+#
+# Starting at 1.0.0 rather than 0.x is deliberate. A task's MAJOR version is its public
+# reference -- pipelines write `ArgoCDApp@1` -- and the task directories are already
+# ArgoCD*V1. Shipping 0.x would mean `ArgoCDApp@0`, and the eventual 1.0 would then break
+# every consumer pipeline for no reason other than version cosmetics.
+next-version: 1.0.0
+mode: ContinuousDeployment
+branches:
+  main:
+    regex: ^master$|^main$
+    mode: ContinuousDeployment
+    label: ''
+    increment: Patch
+minor-version-bump-message: '\+semver:\s?(feature|minor)|^feat(\(.+\))?!?:'
+patch-version-bump-message: '\+semver:\s?(fix|patch)|^fix(\(.+\))?!?:'
+no-bump-message: '\+semver:\s?(none|skip)'

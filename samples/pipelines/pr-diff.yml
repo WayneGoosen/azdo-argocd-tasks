@@ -1,0 +1,28 @@
+# Pull request gate: show reviewers exactly what would change in the cluster.
+#
+# failOnDiff is false, so the build reports "succeeded with issues" and the diff appears in
+# the run summary rather than blocking the PR. Set it to true to make an unexpected drift
+# an outright failure.
+trigger: none
+pr:
+  branches: { include: [main] }
+
+jobs:
+  - job: Diff
+    pool: { vmImage: ubuntu-latest }
+    steps:
+      - task: ArgoCDApp@1
+        name: argocd
+        displayName: Argo CD diff
+        inputs:
+          connection: 'argocd-prod'
+          command: 'diff'
+          applications: 'payments-api'
+          project: 'payments'
+          failOnDiff: false
+          publishSummary: true
+
+      - script: |
+          echo "Resources changed: $(argocd.diffResourceCount)"
+        displayName: Report diff size
+        condition: eq(variables['argocd.hasDiff'], 'true')

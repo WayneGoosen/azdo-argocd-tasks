@@ -1,0 +1,34 @@
+# The recommended default: a role on a single AppProject.
+#
+# A token minted from this role can only ever touch applications in this project, and is
+# revoked by deleting its JWT ID from the role -- no account or policy changes needed.
+#
+#   argocd proj role create-token payments ado-ci --expires-in 90d
+#   argocd proj role list-token-ids payments ado-ci
+#   argocd proj role delete-token payments ado-ci <jwt-id>
+#
+# Verify the policy actually does what you think before relying on it:
+#   argocd admin settings rbac can ado-ci sync applications payments/payments-api
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: payments
+  namespace: argocd
+spec:
+  description: Payments team applications
+  sourceRepos:
+    - https://dev.azure.com/contoso/payments/_git/gitops
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: payments-*
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  roles:
+    - name: ado-ci
+      description: Azure DevOps pipeline identity for the payments team
+      policies:
+        - p, proj:payments:ado-ci, applications, get,  payments/*, allow
+        - p, proj:payments:ado-ci, applications, sync, payments/*, allow
+      groups: []

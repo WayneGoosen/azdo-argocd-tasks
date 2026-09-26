@@ -1,0 +1,4 @@
+v3.3.14
+https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.14/assets/swagger.json
+paths=80
+definitions=261

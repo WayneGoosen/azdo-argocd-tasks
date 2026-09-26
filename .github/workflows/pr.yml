@@ -1,0 +1,125 @@
+# Pull request gate: typecheck, test, and prove the VSIX actually packages.
+#
+# The VSIX asset assertion is not ceremony. tfx SILENTLY drops Content.Details and
+# Screenshots.N if the marketplace/ folder is listed in vss-extension.json "files", and the
+# only symptom is an empty marketplace listing after publishing a version you cannot replace.
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # GitVersion counts from repo init without full history
+
+      - uses: gittools/actions/gitversion/setup@v4.0.1
+        with:
+          versionSpec: '6.x'
+
+      - id: gitversion
+        uses: gittools/actions/gitversion/execute@v4.0.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+        name: Typecheck
+
+      - run: npm test
+        name: Unit, contract and end-to-end tests
+
+      - name: Stamp version
+        run: node scripts/stamp-version.mjs "${{ steps.gitversion.outputs.majorMinorPatch }}"
+
+      - run: npm run package
+        name: Package VSIX
+
+      - name: Verify VSIX marketplace assets
+        run: |
+          set -euo pipefail
+          VSIX=$(ls dist/*.vsix)
+          MANIFEST=$(unzip -p "$VSIX" extension.vsixmanifest)
+          fail=0
+          for asset in Microsoft.VisualStudio.Services.Content.Details \
+                       Microsoft.VisualStudio.Services.Icons.Default; do
+            if ! grep -q "$asset" <<<"$MANIFEST"; then
+              echo "::error::Missing asset entry $asset. Is marketplace/ listed in vss-extension.json files[]?"
+              fail=1
+            fi
+          done
+          # Screenshots are not declared yet; make that a visible reminder, not a failure.
+          if ! grep -q "Microsoft.VisualStudio.Services.Screenshots.1" <<<"$MANIFEST"; then
+            echo "::warning::No screenshots declared. Add them before the first public publish."
+          fi
+          exit $fail
+
+      - name: Verify the task bundles
+        run: |
+          set -euo pipefail
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const builtins = new Set(require('module').builtinModules);
+            const tasksDir = 'dist/tasks';
+            let failed = false;
+            for (const task of fs.readdirSync(tasksDir)) {
+              const src = fs.readFileSync(path.join(tasksDir, task, 'index.js'), 'utf8');
+
+              // Anything required at runtime that is not a Node builtin means the bundle is
+              // incomplete, and the task fails on an agent with a bare module error.
+              const required = [...src.matchAll(/require\("([^".\/][^"]*)"\)/g)].map(m => m[1]);
+              const external = [...new Set(required)].filter(m => !builtins.has(m.replace(/^node:/, '')));
+              if (external.length) {
+                console.error('::error::' + task + ' has unbundled runtime requires: ' + external.join(', '));
+                failed = true;
+              }
+
+              // azure-pipelines-task-lib holds module-level state (output streams, secret
+              // handling, resource strings). Two bundled copies split that state silently.
+              // azure-pipelines-tool-lib depends on task-lib too, so this is a live risk.
+              const copies = (src.match(/loading inputs and endpoints/g) || []).length;
+              if (copies !== 1) {
+                console.error('::error::' + task + ' bundles ' + copies + ' copies of azure-pipelines-task-lib (expected 1)');
+                failed = true;
+              }
+
+              console.log(task + ': ok (' + (fs.statSync(path.join(tasksDir, task, 'index.js')).size / 1024).toFixed(0) + ' KiB)');
+            }
+            if (failed) process.exit(1);
+          "
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: dist/*.vsix
+          retention-days: 14
+
+      - name: Comment the calculated version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.gitversion.outputs.majorMinorPatch }}';
+            const marker = '<!-- argocd-tasks-version -->';
+            const body = `${marker}\n**Version if merged:** \`${version}\`\n\nThe \`.vsix\` is attached to this run as an artifact.`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }

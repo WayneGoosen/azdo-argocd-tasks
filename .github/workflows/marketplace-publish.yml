@@ -1,0 +1,50 @@
+# Publish an existing release to the Visual Studio Marketplace.
+#
+# Deliberately manual and deliberately separate from main.yml: the Marketplace rejects
+# re-uploading a version that already exists, so publishing is a one-way door per version.
+#
+# NOTE ON CREDENTIALS: this uses a publisher PAT. Microsoft decommissions all global PATs on
+# 1 December 2026. The replacement is workload identity federation, which is confirmed
+# working in azure-devops-extension-tasks@5 (connectTo: AzureRM acquires an Entra token for
+# resource 499b84ac-1321-427f-aa17-267ca6975798 internally). See .github/RELEASING.md.
+name: Publish to Marketplace
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish, e.g. v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: marketplace
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download the VSIX from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "${{ inputs.tag }}" --pattern '*.vsix' --dir dist
+
+      - name: Install tfx
+        # >= 0.22.5 is the first version that recognises the Node24 handler. Pinning to the
+        # current line rather than 'latest' keeps publishes reproducible.
+        run: npm i -g tfx-cli@^0.24.2
+
+      - name: Publish
+        env:
+          TFX_TOKEN: ${{ secrets.ADO_PUBLISHER_PAT }}
+        run: |
+          set -euo pipefail
+          VSIX=$(ls dist/*.vsix)
+          tfx extension publish --vsix "$VSIX" --token "$TFX_TOKEN" --no-color

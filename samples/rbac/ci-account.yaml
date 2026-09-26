@@ -1,0 +1,41 @@
+# A local Argo CD account for CI, with NO login capability.
+#
+# Use this when a pipeline must cross project boundaries (AppSets, clusters, repos).
+# For ordinary application sync, prefer a project role token instead -- see project-role.yaml --
+# because its blast radius is one AppProject rather than whatever policy.csv grants.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # apiKey only: this account can hold API tokens but cannot sign in to the UI.
+  accounts.ado-payments-ci: apiKey
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # No implicit read for authenticated users. Grant everything explicitly.
+  policy.default: ''
+  policy.csv: |
+    p, role:ado-payments-ci, applications, get,  payments/*, allow
+    p, role:ado-payments-ci, applications, sync, payments/*, allow
+
+    # Argo CD 3.0 made RBAC fine-grained: update/delete on an Application no longer
+    # implies the same on its sub-resources. Grant these only if the pipeline restarts
+    # or deletes individual resources.
+    # p, role:ado-payments-ci, applications, action/apps/Deployment/restart, payments/*, allow
+
+    # An explicit deny cannot be overridden by a later allow. Useful for production.
+    p, role:ado-payments-ci, applications, delete, payments/*, deny
+
+    g, ado-payments-ci, role:ado-payments-ci

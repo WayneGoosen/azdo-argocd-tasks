@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["ES2022"],
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "exactOptionalPropertyTypes": false,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "types": ["node"],
+
+        // esbuild emits the shipped bundles (scripts/build.mjs); tsc is a type checker only.
+        // Keeping a single non-emitting project avoids TS project references and the stale-
+        // .d.ts problems that come with them for internal-only workspace packages.
+        "noEmit": true
+    },
+    "include": [
+        "packages/**/src/**/*.ts",
+        "packages/*/test/**/*.ts",
+        "tasks/**/*.ts",
+        "test/**/*.ts",
+        "scripts/**/*.ts"
+    ],
+    "exclude": ["node_modules", "dist"]
+}

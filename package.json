@@ -1,0 +1,39 @@
+{
+    "name": "azdo-argocd-tasks",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Azure DevOps pipeline tasks for Argo CD",
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/WayneGoosen/azdo-argocd-tasks"
+    },
+    "engines": {
+        "node": ">=20"
+    },
+    "workspaces": [
+        "packages/*",
+        "tasks/*"
+    ],
+    "scripts": {
+        "clean": "rimraf dist *.vsix",
+        "typecheck": "tsc --noEmit",
+        "build": "npm run clean && npm run typecheck && node scripts/build.mjs",
+        "build:dev": "node scripts/build.mjs --sourcemap",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "package": "npm run build && tfx extension create --manifest-globs vss-extension.json --output-path dist/",
+        "package:dev": "npm run build && tfx extension create --manifest-globs vss-extension.json --overrides-file vss-extension.dev.json --output-path dist/",
+        "stamp": "node scripts/stamp-version.mjs",
+        "swagger:fetch": "node scripts/fetch-swagger.mjs"
+    },
+    "devDependencies": {
+        "@types/js-yaml": "^4.0.9",
+        "@types/node": "^20.19.9",
+        "esbuild": "^0.25.0",
+        "rimraf": "^6.0.1",
+        "tfx-cli": "^0.24.2",
+        "typescript": "^5.7.3",
+        "vitest": "^3.0.5"
+    }
+}

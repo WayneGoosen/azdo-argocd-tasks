@@ -1,0 +1,65 @@
+# Roll back a bad deployment.
+#
+# Two things worth knowing before wiring this into an on-call runbook:
+#
+#   1. Argo CD REFUSES to roll back an application with automated sync enabled, because the
+#      controller would immediately sync it forward again. The task checks this up front and
+#      fails with an explanation rather than a server error.
+#   2. Rolling back through Argo CD leaves the cluster ahead of Git. It is the right tool for
+#      stopping the bleeding; the durable fix is to revert in Git so the two agree again.
+trigger: none
+
+parameters:
+  - name: application
+    type: string
+    default: payments-api
+  - name: historyId
+    type: string
+    default: previous
+
+jobs:
+  - deployment: Rollback
+    environment: 'payments-production'
+    pool: { vmImage: ubuntu-latest }
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            # Show what is available first, so the run log records what was rolled back from.
+            - task: ArgoCDApp@1
+              name: history
+              displayName: List deployment history
+              inputs:
+                connection: 'argocd-prod'
+                command: 'history'
+                applications: ${{ parameters.application }}
+                project: 'payments'
+
+            - task: ArgoCDApp@1
+              name: rollback
+              displayName: Roll back ${{ parameters.application }}
+              inputs:
+                connection: 'argocd-prod'
+                command: 'rollback'
+                applications: ${{ parameters.application }}
+                project: 'payments'
+                historyId: ${{ parameters.historyId }}
+                wait: true
+                waitFor: 'sync,health'
+                timeoutSeconds: '600'
+
+            - script: |
+                echo "Rolled back to history ID $(rollback.rolledBackTo)"
+                echo "Now at revision $(rollback.revision), health $(rollback.healthStatus)"
+              displayName: Report the outcome
+
+            # On failure, collect the evidence rather than making someone re-run by hand.
+            - task: ArgoCDApp@1
+              displayName: Collect logs for triage
+              condition: failed()
+              inputs:
+                connection: 'argocd-prod'
+                command: 'logs'
+                applications: ${{ parameters.application }}
+                project: 'payments'
+                tailLines: '500'
