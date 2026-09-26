@@ -54,12 +54,15 @@ jobs:
       - name: Install kind and the Argo CD CLI
         run: |
           set -euo pipefail
-          curl -fsSL -o /usr/local/bin/kind \
-            https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64
-          chmod +x /usr/local/bin/kind
-          curl -fsSL -o /usr/local/bin/argocd \
+          # Download to the workspace first, then install with sudo. Writing straight
+          # into /usr/local/bin fails on GitHub runners -- the runner user cannot chmod
+          # files there ("Operation not permitted").
+          curl -fsSL -o kind https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64
+          curl -fsSL -o argocd \
             "https://github.com/argoproj/argo-cd/releases/download/v${{ matrix.argocd }}/argocd-linux-amd64"
-          chmod +x /usr/local/bin/argocd
+          sudo install -m 0755 kind /usr/local/bin/kind
+          sudo install -m 0755 argocd /usr/local/bin/argocd
+          rm -f kind argocd
           kind version
           argocd version --client
 
