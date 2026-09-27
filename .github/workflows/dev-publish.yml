@@ -34,17 +34,36 @@ jobs:
       - run: npm test
 
       - name: Build dev overrides
+        env:
+          TFX_TOKEN: ${{ secrets.ADO_PUBLISHER_PAT }}
         run: |
           set -euo pipefail
-          # A run-number version keeps dev builds monotonic without touching GitVersion.
-          jq --arg v "0.0.${{ github.run_number }}" '. + {version: $v}' \
+          # The Marketplace refuses any version it has already seen, and github.run_number
+          # is not a safe source: it starts at 1, so the first dev publish collides with
+          # anything uploaded by hand, and it never catches up afterwards.
+          #
+          # Ask the Marketplace what is actually published and increment that instead.
+          # Also used by the publish step below.
+          npm i -g tfx-cli@^0.24.2 >/dev/null 2>&1
+          PUBLISHED=$(tfx extension show \
+            --publisher "$(jq -r .publisher vss-extension.json)" \
+            --extension-id "$(jq -r .id vss-extension.dev.json)" \
+            --token "$TFX_TOKEN" --json --no-color 2>/dev/null \
+            | jq -r '.versions[0].version // empty' || true)
+
+          if [ -z "$PUBLISHED" ]; then
+            NEXT="0.0.1"
+            echo "Nothing published yet; starting at $NEXT"
+          else
+            NEXT=$(echo "$PUBLISHED" | awk -F. '{printf "%d.%d.%d", $1, $2, $3 + 1}')
+            echo "Published $PUBLISHED; publishing $NEXT"
+          fi
+
+          jq --arg v "$NEXT" '. + {version: $v}' \
             vss-extension.dev.json > vss-extension.dev.effective.json
           cat vss-extension.dev.effective.json
 
       - run: node scripts/build.mjs
-
-      - name: Install tfx
-        run: npm i -g tfx-cli@^0.24.2
 
       - name: Publish and share
         env:

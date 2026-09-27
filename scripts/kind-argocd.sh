@@ -49,8 +49,14 @@ kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply
 kubectl apply -n "${NAMESPACE}" --server-side --force-conflicts \
     -f "https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/install.yaml"
 
-echo "==> Waiting for the Argo CD server to become available"
-kubectl rollout status -n "${NAMESPACE}" deployment/argocd-server --timeout=300s
+echo "==> Waiting for Argo CD to become available"
+# All of these must be up, not just the API server: the server and repo-server both cache
+# through redis, and a missing redis surfaces to the client as an opaque HTTP 500
+# ("dial tcp ...:6379: connection refused") rather than as a readiness problem.
+for deploy in argocd-redis argocd-repo-server argocd-server argocd-applicationset-controller; do
+    kubectl rollout status -n "${NAMESPACE}" "deployment/${deploy}" --timeout=300s
+done
+kubectl rollout status -n "${NAMESPACE}" statefulset/argocd-application-controller --timeout=300s
 
 echo "==> Creating the '${ACCOUNT}' apiKey account"
 kubectl patch configmap argocd-cm -n "${NAMESPACE}" --type merge \
@@ -112,11 +118,18 @@ spec:
     syncOptions:
       - CreateNamespace=true
 APP
-    # Give the repo-server time to clone and produce a first status, so the integration
-    # tests do not race application creation.
+    # Wait for a first status, then actually SYNC it. Creating the application only
+    # registers it; with no auto-sync policy it stays OutOfSync/Missing, and a status
+    # check against a never-deployed application correctly fails.
     kubectl wait -n "${NAMESPACE}" --for=jsonpath='{.status.sync.status}' \
         --timeout=180s "application/${SAMPLE_APP}" 2>/dev/null || \
         echo "    (proceeding; the application has not reported a sync status yet)"
+
+    echo "==> Syncing '${SAMPLE_APP}' so the fixture starts healthy"
+    argocd app sync "${SAMPLE_APP}" --insecure --grpc-web --timeout 300 || \
+        echo "    (sync reported a problem; continuing so the tests can report it)"
+    argocd app wait "${SAMPLE_APP}" --sync --health --insecure --grpc-web --timeout 300 || \
+        echo "    (application did not become healthy in time)"
 fi
 
 cat > "${ENV_FILE}" <<ENV

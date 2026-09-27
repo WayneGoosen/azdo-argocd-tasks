@@ -93,6 +93,11 @@ export function runTask(options: TaskRunOptions): Promise<TaskRunResult> {
 
     const env: NodeJS.ProcessEnv = {
         PATH: process.env['PATH'] ?? '',
+        // A real agent always provides these. The argocd CLI in particular exits with
+        // `$HOME is not defined` without HOME, which surfaced only in CI because the
+        // local shell happened to inherit it.
+        HOME: process.env['HOME'] ?? tempDirectory,
+        USER: process.env['USER'] ?? 'runner',
         AGENT_TEMPDIRECTORY: tempDirectory,
         AGENT_OS: 'Linux',
         ...Object.fromEntries(
