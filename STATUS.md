@@ -20,6 +20,14 @@ things that will bite you. Written so it can be picked up cold.
 **Going public.** The repo is public, Pages is live, and the manifest is flipped. Two things
 stand between here and a listing:
 
+- [ ] **Free the `ARGOCD` endpoint name, or confirm we no longer need it.** The 1.0.4 publish
+      was rejected because something already holds it — almost certainly the private dev
+      extension uploaded by hand to test in the org. Production now declares `argocdrest`
+      instead, so this no longer blocks, but the stale private extension is worth removing at
+      <https://marketplace.visualstudio.com/manage>.
+- [ ] **Recreate the Argo CD service connection** in the test org after installing a build with
+      the renamed endpoint type. The old connection is bound to the old type and will not
+      appear in the picker.
 - [ ] **Get the publisher verified** by Microsoft. Account-level, nothing to do with the code.
       An unverified publisher cannot list publicly whatever the manifest says.
 - [ ] **Capture screenshots** into `marketplace/images/` and declare them in
@@ -85,6 +93,19 @@ Non-obvious facts that cost real time to find. All verified against the Argo CD 
   reconstruct a spec from typed fields — mutate the parsed object in place. The narrow TS types are
   a compile-time view only; `JSON.parse` keeps everything. See
   `packages/task-common/src/spec-mutation.ts` and its no-field-loss test.
+- **Service endpoint type names are a Marketplace-GLOBAL namespace.** Not per-publisher, not
+  per-extension. The first extension to publish a given name holds it, and every later
+  extension declaring it is rejected at validation:
+  `The Service Endpoint Contribution ...ServiceEndpointName.ARGOCD with Name ARGOCD already
+  exists`. This killed the 1.0.4 publish. The name is invisible to users — they only ever see
+  `displayName` and their own connection's name — so it costs nothing to make it distinctive:
+  ours is `argocdrest`. The dev build derives its own (`argocdrestdev`) in
+  `scripts/dev-overrides.mjs`, because a dev build holding the name blocks production.
+  Renaming it after publishing would orphan every user's existing service connection.
+- **The endpoint name lives in two places that must agree**: `properties.name` on the
+  contribution, and `connectedService:<name>` in every `task.json`. A mismatch is not an error
+  anywhere — the connection picker just comes up empty. Guarded by
+  `test/manifest/extension-manifest.test.ts`.
 - **`restricted` command mode blocks `prependpath` and `uploadsummary`.** Only `ArgoCDCli@1` can use
   it. `settableVariables` is a separate check and is safe on every task.
 - **`task.json` input and output names cannot contain underscores** — the schema pattern is
@@ -154,6 +175,6 @@ auth. A half-tested credential-rotation task is worse than the documented step i
   (redirects to the account's `waynegoosen.com` custom domain)
 - **Marketplace:** `"public": true`, **nothing published yet** — `marketplace-publish.yml` has
   never run, so no production version is spent
-- **Tests:** 469 passing, 28 integration skipped (no live server)
+- **Tests:** 471 passing, 28 integration skipped (no live server)
 - **Build:** 6 task bundles, each self-contained, 576 KiB VSIX
 - **Docs:** `mkdocs build --strict` clean

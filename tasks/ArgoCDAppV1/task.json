@@ -84,7 +84,7 @@
     "inputs": [
         {
             "name": "connection",
-            "type": "connectedService:argocd",
+            "type": "connectedService:argocdrest",
             "label": "Argo CD service connection",
             "required": true,
             "helpMarkDown": "The Argo CD server and token to use. Prefer a project role token scoped to a single AppProject."

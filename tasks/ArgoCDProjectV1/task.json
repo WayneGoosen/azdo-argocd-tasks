@@ -17,7 +17,7 @@
     "inputs": [
         {
             "name": "connection",
-            "type": "connectedService:argocd",
+            "type": "connectedService:argocdrest",
             "label": "Argo CD service connection",
             "required": true,
             "helpMarkDown": "Minting tokens needs a token with `update` permission on the project or account."

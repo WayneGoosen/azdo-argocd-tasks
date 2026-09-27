@@ -17,7 +17,7 @@
     "inputs": [
         {
             "name": "connection",
-            "type": "connectedService:argocd",
+            "type": "connectedService:argocdrest",
             "label": "Argo CD service connection",
             "required": true,
             "helpMarkDown": "The Argo CD server and token. Injected as ARGOCD_SERVER and ARGOCD_AUTH_TOKEN into the CLI process only."

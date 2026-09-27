@@ -3,6 +3,10 @@
 # WARNING: the dev extension reuses the production task GUID. Install it in an organisation
 # that does NOT have the public extension installed, or the two task registrations collide
 # and pipelines resolve the wrong one.
+#
+# The service endpoint type name IS made unique, by scripts/dev-overrides.mjs -- that one is
+# a Marketplace-global namespace, and a dev build holding it blocks the production publish
+# outright. See the comment at the top of that script.
 name: Dev publish
 
 on:
@@ -59,11 +63,16 @@ jobs:
             echo "Published $PUBLISHED; publishing $NEXT"
           fi
 
-          jq --arg v "$NEXT" '. + {version: $v}' \
-            vss-extension.dev.json > vss-extension.dev.effective.json
-          cat vss-extension.dev.effective.json
+          echo "DEV_VERSION=$NEXT" >> "$GITHUB_ENV"
 
       - run: node scripts/build.mjs
+
+      - name: Rewrite the manifest and task inputs for dev
+        # Must run AFTER the build: it patches dist/tasks/*/task.json in place.
+        run: |
+          set -euo pipefail
+          node scripts/dev-overrides.mjs "$DEV_VERSION"
+          cat vss-extension.dev.effective.json
 
       - name: Publish and share
         env:

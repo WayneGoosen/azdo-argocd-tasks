@@ -87,7 +87,7 @@
                 "ms.vss-endpoint.endpoint-types"
             ],
             "properties": {
-                "name": "argocd",
+                "name": "argocdrest",
                 "displayName": "Argo CD",
                 "url": {
                     "displayName": "Server URL",

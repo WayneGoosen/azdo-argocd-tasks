@@ -7,11 +7,24 @@
 import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import * as os from 'node:os';
 
 const ROOT = path.join(__dirname, '..', '..');
 
+interface EndpointContribution {
+    type: string;
+    properties: { name: string; displayName: string };
+}
+
+interface TaskManifest {
+    name: string;
+    inputs: Array<{ name: string; type: string }>;
+}
+
 interface ExtensionManifest {
     id: string;
+    contributions?: EndpointContribution[];
     public?: boolean;
     icons?: Record<string, string>;
     content?: { details?: { path?: string } };
@@ -21,6 +34,22 @@ interface ExtensionManifest {
 
 function readManifest(file: string): ExtensionManifest {
     return JSON.parse(fs.readFileSync(path.join(ROOT, file), 'utf8')) as ExtensionManifest;
+}
+
+const ENDPOINT_TYPE = 'ms.vss-endpoint.service-endpoint-type';
+
+function endpointContribution(m: ExtensionManifest): EndpointContribution {
+    const found = (m.contributions ?? []).find((c) => c.type === ENDPOINT_TYPE);
+    if (!found) throw new Error('no service-endpoint-type contribution');
+    return found;
+}
+
+function taskManifests(): TaskManifest[] {
+    const dir = path.join(ROOT, 'tasks');
+    return fs
+        .readdirSync(dir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'task.json')))
+        .map((e) => JSON.parse(fs.readFileSync(path.join(dir, e.name, 'task.json'), 'utf8')) as TaskManifest);
 }
 
 const manifest = readManifest('vss-extension.json');
@@ -46,6 +75,71 @@ describe('extension manifest', () => {
         for (const asset of assets) {
             expect(fs.existsSync(path.join(ROOT, asset)), `${asset} is declared but missing`).toBe(true);
         }
+    });
+
+    it('declares the same endpoint type name that every task asks for', () => {
+        // A `connectedService:<name>` input whose name does not match the endpoint
+        // contribution is not an error anywhere -- the connection picker just comes up
+        // empty, and the task is unusable with no clue why.
+        const endpoint = endpointContribution(manifest);
+        for (const task of taskManifests()) {
+            const connections = task.inputs
+                .filter((i) => i.type.startsWith('connectedService:'))
+                .map((i) => i.type.slice('connectedService:'.length));
+            for (const name of connections) {
+                expect(name, `${task.name} asks for an endpoint type nothing declares`).toBe(
+                    endpoint.properties.name,
+                );
+            }
+        }
+    });
+
+    it('gives the dev build a different endpoint type name', () => {
+        // Service endpoint type names are a Marketplace-GLOBAL namespace: one extension
+        // holding a name blocks every other extension that declares it, including our own.
+        // A dev build sharing production's name makes the production publish impossible --
+        // this is exactly how the 1.0.4 publish was rejected.
+        // Run against a scratch copy of the task manifests: the script patches them in
+        // place, and poisoning dist/ here would ship a VSIX whose tasks ask for a
+        // connection type the manifest does not declare.
+        const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'argocd-dev-overrides-'));
+        const scratchTasks = path.join(scratch, 'tasks');
+        const outFile = path.join(scratch, 'effective.json');
+        for (const task of taskManifests()) {
+            fs.mkdirSync(path.join(scratchTasks, task.name), { recursive: true });
+            fs.writeFileSync(
+                path.join(scratchTasks, task.name, 'task.json'),
+                JSON.stringify(task, null, 4),
+            );
+        }
+
+        execFileSync(
+            'node',
+            [
+                path.join(ROOT, 'scripts', 'dev-overrides.mjs'),
+                '9.9.9',
+                '--tasks-dir', scratchTasks,
+                '--out', outFile,
+            ],
+            { cwd: ROOT, encoding: 'utf8' },
+        );
+
+        const effective = JSON.parse(fs.readFileSync(outFile, 'utf8')) as ExtensionManifest;
+        const devName = endpointContribution(effective).properties.name;
+        expect(devName).not.toBe(endpointContribution(manifest).properties.name);
+
+        // The manifest rename is only half of it -- the task inputs must follow, or the
+        // dev extension's connection picker silently offers nothing.
+        for (const task of taskManifests()) {
+            const patched = JSON.parse(
+                fs.readFileSync(path.join(scratchTasks, task.name, 'task.json'), 'utf8'),
+            ) as TaskManifest;
+            for (const input of patched.inputs.filter((i) => i.type.startsWith('connectedService:'))) {
+                expect(input.type).toBe(`connectedService:${devName}`);
+            }
+        }
+
+        fs.rmSync(scratch, { recursive: true, force: true });
     });
 
     it('does not list marketplace/ in files[]', () => {

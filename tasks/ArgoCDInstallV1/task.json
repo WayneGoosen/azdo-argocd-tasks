@@ -33,7 +33,7 @@
         },
         {
             "name": "connection",
-            "type": "connectedService:argocd",
+            "type": "connectedService:argocdrest",
             "label": "Argo CD service connection",
             "required": false,
             "helpMarkDown": "Required when Version is `server`, or when Source is `server`. Not needed for `latest` or an explicit version."

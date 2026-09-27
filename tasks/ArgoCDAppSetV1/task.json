@@ -24,7 +24,7 @@
     "inputs": [
         {
             "name": "connection",
-            "type": "connectedService:argocd",
+            "type": "connectedService:argocdrest",
             "label": "Argo CD service connection",
             "required": true
         },
