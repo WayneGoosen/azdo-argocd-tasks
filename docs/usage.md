@@ -3,6 +3,19 @@
 Every task takes an **Argo CD service connection**, which carries the server URL and a token.
 See [Security](security.md) for which credential to use and how to scope it.
 
+## Always set `displayName`
+
+In a YAML pipeline, a step with no `displayName` shows the **task identifier** in the run —
+`ArgoCDInstall`, not the friendly name. That is Azure DevOps behaviour, not something the task
+can change: a task's `name` is its `TaskName@1` reference and cannot contain spaces.
+
+```yaml
+- task: ArgoCDInstall@1
+  displayName: Install Argo CD CLI    # ← the step header in the run
+```
+
+Every example below sets one.
+
 ## Deploying
 
 Sync an application and wait for it to become healthy. This is the common case.
@@ -54,6 +67,7 @@ Show reviewers what would actually change in the cluster, without blocking the b
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Show what would change
   inputs:
     connection: 'argocd-prod'
     command: 'diff'
@@ -70,6 +84,7 @@ persisting anything:
 
 ```yaml
 - task: ArgoCDAppSet@1
+  displayName: Preview generated applications
   name: preview
   inputs:
     connection: 'argocd-prod'
@@ -84,6 +99,7 @@ Roll back to the previous revision:
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Roll back the application
   inputs:
     connection: 'argocd-prod'
     command: 'rollback'
@@ -122,6 +138,7 @@ Name them one per line, or match them with a label selector:
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Wait for the application
   inputs:
     connection: 'argocd-prod'
     command: 'wait'
@@ -146,11 +163,13 @@ subcommands — install the CLI and run it with authentication injected:
 
 ```yaml
 - task: ArgoCDInstall@1
+  displayName: Install Argo CD CLI
   inputs:
     connection: 'argocd-prod'
     version: 'server'      # match the server you are talking to
 
 - task: ArgoCDCli@1
+  displayName: Run argocd
   inputs:
     connection: 'argocd-prod'
     arguments: 'app diff payments-api --local ./manifests'
@@ -177,6 +196,7 @@ Give the step a `name` and reference them as `$(stepName.variable)`:
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Read application status
   name: argocd
   inputs: { connection: 'argocd-prod', command: 'get', applications: 'payments-api', project: 'payments' }
 

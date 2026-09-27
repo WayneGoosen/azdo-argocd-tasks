@@ -801,10 +801,14 @@ export class ArgoCdClient {
         if (this.token !== undefined && this.token !== '') {
             headers['Authorization'] = `Bearer ${this.token}`;
         }
-        if (args.body !== undefined) {
-            // Argo CD may be configured with --api-content-type, which rejects writes
-            // whose Content-Type does not match.
+        if (isWrite) {
+            // Every non-GET needs a Content-Type, INCLUDING bodyless DELETEs. Argo CD
+            // wraps the gateway in enforceContentTypes, which rejects them with a bare
+            // HTTP 415 before the handler runs -- verified against a live 3.5.3 server:
+            // DELETE .../operation returns 415 without this header and 400 with it.
             headers['Content-Type'] = 'application/json';
+        }
+        if (args.body !== undefined) {
             headers['Content-Length'] = String(Buffer.byteLength(args.body, 'utf8'));
         }
 

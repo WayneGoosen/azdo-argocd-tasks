@@ -62,6 +62,7 @@ Add an **Argo CD** service connection (Project settings → Service connections)
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Wait for the application
   inputs:
     connection: 'argocd-prod'
     command: 'wait'
@@ -87,11 +88,13 @@ Reach for `ArgoCDApp@1` first. The CLI tasks are the escape hatch for what REST 
 
 ```yaml
 - task: ArgoCDInstall@1
+  displayName: Install Argo CD CLI
   inputs:
     connection: 'argocd-prod'
     version: 'server'        # match the server you are talking to
 
 - task: ArgoCDCli@1
+  displayName: Run argocd
   inputs:
     connection: 'argocd-prod'
     arguments: 'app diff payments-api --local ./manifests'
@@ -127,6 +130,7 @@ Reach for `ArgoCDApp@1` first. The CLI tasks are the escape hatch for what REST 
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Roll back the application
   inputs:
     connection: 'argocd-prod'
     command: 'rollback'
@@ -146,6 +150,7 @@ Reach for `ArgoCDApp@1` first. The CLI tasks are the escape hatch for what REST 
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Create the application
   inputs:
     connection: 'argocd-prod'
     command: 'create'
@@ -157,6 +162,7 @@ Reach for `ArgoCDApp@1` first. The CLI tasks are the escape hatch for what REST 
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Update the application spec
   inputs:
     connection: 'argocd-prod'
     command: 'set'
@@ -177,6 +183,7 @@ Reach for `ArgoCDApp@1` first. The CLI tasks are the escape hatch for what REST 
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Delete the application
   inputs:
     connection: 'argocd-prod'
     command: 'delete'
@@ -194,6 +201,7 @@ Reach for `ArgoCDApp@1` first. The CLI tasks are the escape hatch for what REST 
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Run a resource action
   inputs:
     connection: 'argocd-prod'
     command: 'action'
@@ -211,6 +219,7 @@ Every command sets `appsJson`; single-application runs also set scalars.
 
 ```yaml
 - task: ArgoCDApp@1
+  displayName: Read application status
   name: argocd
   inputs: { connection: 'argocd-prod', command: 'get', applications: 'payments-api', project: 'payments' }
 
@@ -248,6 +257,7 @@ anything, which makes a pull request able to show what a change adds or removes:
 
 ```yaml
 - task: ArgoCDAppSet@1
+  displayName: Preview generated applications
   name: preview
   inputs:
     connection: 'argocd-prod'
@@ -273,6 +283,7 @@ once. `ArgoCDProject@1` and `ArgoCDAccount@1` exist so you can rotate it on a sc
 
 ```yaml
 - task: ArgoCDProject@1
+  displayName: Mint an Argo CD token
   name: mint
   inputs:
     connection: 'argocd-rotation'   # a separate token that may only manage tokens
@@ -292,6 +303,7 @@ Mint, update the connection, **verify**, then revoke — in that order. The full
 
 ```yaml
 - task: ArgoCDAccount@1
+  displayName: Check permissions
   inputs:
     connection: 'argocd-prod'
     command: 'can-i'

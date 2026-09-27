@@ -396,6 +396,15 @@
             "helpMarkDown": "Action to run, for example `restart`. **Leave empty to list the actions available on the resource.**"
         },
         {
+            "name": "resourceVersion",
+            "type": "string",
+            "label": "Resource apiVersion",
+            "defaultValue": "",
+            "required": false,
+            "groupName": "action",
+            "helpMarkDown": "API version of the resource, e.g. `v1`. Required by Argo CD, but resolved automatically from the application resource tree \u2014 only set this if resolution fails."
+        },
+        {
             "name": "actionParameters",
             "type": "multiLine",
             "label": "Action parameters",

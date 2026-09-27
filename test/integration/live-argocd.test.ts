@@ -499,7 +499,12 @@ spec:
         }, 240_000);
     });
 
-    describe('ArgoCDInstall@1 and ArgoCDCli@1', () => {
+    // The Argo CD server only serves a LINUX CLI binary, so `source: server` correctly
+    // refuses on macOS. These run in CI (ubuntu) and are skipped when developing locally
+    // on another platform -- the refusal itself is covered by a unit test.
+    const describeLinuxOnly = process.platform === 'linux' ? describe : describe.skip;
+
+    describeLinuxOnly('ArgoCDInstall@1 and ArgoCDCli@1', () => {
         it('installs the CLI straight from the Argo CD server', async () => {
             // The whole point of this test: the /download route is Linux-only and serves only
             // the server's own architecture. Nothing but a real server proves that works.

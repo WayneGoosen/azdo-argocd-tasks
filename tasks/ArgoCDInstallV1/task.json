@@ -73,6 +73,7 @@
     "restrictions": {
         "settableVariables": {
             "allowed": [
+                "PATH",
                 "argocdPath",
                 "argocdVersion"
             ]

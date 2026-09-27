@@ -23,6 +23,10 @@ on:
     paths:
       - 'packages/**'
       - 'tasks/**'
+      # Watch this workflow and the harness it runs, so a fix to either actually
+      # re-triggers the job rather than sitting unverified.
+      - 'scripts/kind-argocd.sh'
+      - '.github/workflows/integration.yml'
   workflow_dispatch:
 
 permissions:

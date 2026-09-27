@@ -47,6 +47,61 @@ export function readTargetResource(): ResourceRef {
     return parsed[0] as ResourceRef;
 }
 
+/**
+ * Fill in the parts of a resource reference the API insists on but users should not have
+ * to know.
+ *
+ * `version` is a REQUIRED proto field on both resource-action endpoints -- omitting it
+ * fails with `proto: required field "version" not set` before routing. `namespace` is not
+ * marked required but the server's lookup needs it: verified against a live 3.5.3 server,
+ * the same request returns 200 with a namespace and 400 without.
+ *
+ * Both are read out of the application's resource tree, which reports the group, version
+ * and namespace of every managed resource. That means `apps:Deployment:guestbook-ui` is
+ * enough, instead of making callers hand-write an apiVersion and namespace they would have
+ * to look up anyway.
+ */
+export async function resolveResourceRef(
+    ctx: OperationContext,
+    application: { name: string; appNamespace: string | undefined },
+    resource: ResourceRef,
+): Promise<ResourceRef> {
+    const explicitVersion = (tl.getInput('resourceVersion', false) ?? '').trim();
+
+    const tree = await ctx.client.getResourceTree(application.name, {
+        appNamespace: application.appNamespace,
+        project: ctx.common.project,
+    });
+
+    const match = (tree.nodes ?? []).find(
+        (node) =>
+            node.kind === resource.kind &&
+            node.name === resource.name &&
+            (node.group ?? '') === (resource.group ?? '') &&
+            (resource.namespace === undefined || node.namespace === resource.namespace),
+    );
+
+    if (match === undefined) {
+        const candidates = (tree.nodes ?? [])
+            .filter((node) => node.kind === resource.kind)
+            .map((node) => `${node.group === undefined || node.group === '' ? '' : `${node.group}:`}${node.kind}:${node.name}`);
+        throw new Error(
+            `${resource.kind}/${resource.name} is not managed by application "${application.name}". ` +
+                (candidates.length > 0
+                    ? `Resources of that kind in this application: ${[...new Set(candidates)].join(', ')}.`
+                    : 'This application manages no resources of that kind.'),
+        );
+    }
+
+    return {
+        ...resource,
+        version: explicitVersion !== '' ? explicitVersion : (match.version ?? 'v1'),
+        ...(resource.namespace === undefined && match.namespace !== undefined
+            ? { namespace: match.namespace }
+            : {}),
+    };
+}
+
 export async function runAction(ctx: OperationContext): Promise<OperationOutcome> {
     const refs = await resolveApplications(ctx);
     if (refs.length !== 1) {
@@ -57,9 +112,12 @@ export async function runAction(ctx: OperationContext): Promise<OperationOutcome
     }
 
     const ref = refs[0] as { name: string; appNamespace: string | undefined };
-    const resource = readTargetResource();
+    const target = readTargetResource();
     const actionName = (tl.getInput('action', false) ?? '').trim();
     const query = { appNamespace: ref.appNamespace, project: ctx.common.project };
+
+    // Required by the API; resolved from the resource tree so users need not supply it.
+    const resource = await resolveResourceRef(ctx, ref, target);
 
     if (actionName === '') {
         const available = await ctx.client.listResourceActions(ref.name, resource, query);

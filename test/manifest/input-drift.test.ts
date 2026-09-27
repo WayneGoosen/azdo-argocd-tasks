@@ -96,6 +96,22 @@ describe.each(taskDirectories())('%s task.json', (taskName) => {
         expect(dangling).toEqual([]);
     });
 
+    it('allows PATH when the task prepends to it', () => {
+        // prependPath emits ##vso[task.prependpath], which the agent gates through
+        // settableVariables exactly like setvariable. Omitting PATH makes the agent log
+        // "Setting variable 'PATH' has been disabled" and silently drop it -- the task
+        // still reports success, because its own smoke test uses the absolute path, but
+        // the tool never reaches the next step. This shipped once; it does not again.
+        const prependsPath = sourceFiles(taskDir).some((file) =>
+            fs.readFileSync(file, 'utf8').includes('prependPath'),
+        );
+        if (!prependsPath) {
+            return;
+        }
+        const allowed = manifest.restrictions?.settableVariables?.allowed ?? [];
+        expect(allowed, `${taskName} calls prependPath but does not allow PATH`).toContain('PATH');
+    });
+
     it('allows every output variable it sets', () => {
         // settableVariables is a hard gate on the agent: an output missing from the
         // allowlist is silently dropped rather than erroring.

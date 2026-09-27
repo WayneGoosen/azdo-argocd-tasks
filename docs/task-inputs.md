@@ -302,6 +302,7 @@ several steps — that keeps `argocdExitCode` unambiguous.
 
 ```yaml
 - task: ArgoCDCli@1
+  displayName: Run argocd
   inputs:
     connection: 'argocd-prod'
     arguments: |
@@ -407,6 +408,7 @@ the top of a pipeline:
 
 ```yaml
 - task: ArgoCDAccount@1
+  displayName: Check permissions
   inputs:
     connection: 'argocd-prod'
     command: 'can-i'

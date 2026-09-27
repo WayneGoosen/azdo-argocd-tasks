@@ -56,17 +56,34 @@ echo "==> Creating the '${ACCOUNT}' apiKey account"
 kubectl patch configmap argocd-cm -n "${NAMESPACE}" --type merge \
     -p "{\"data\":{\"accounts.${ACCOUNT}\":\"apiKey\"}}"
 kubectl patch configmap argocd-rbac-cm -n "${NAMESPACE}" --type merge \
-    -p "{\"data\":{\"policy.default\":\"\",\"policy.csv\":\"p, role:${ACCOUNT}, applications, *, */*, allow\\np, role:${ACCOUNT}, projects, get, *, allow\\np, role:${ACCOUNT}, logs, get, */*, allow\\np, role:${ACCOUNT}, exec, create, */*, allow\\ng, ${ACCOUNT}, role:${ACCOUNT}\\n\"}}"
+    -p "{\"data\":{\"policy.default\":\"\",\"policy.csv\":\"p, role:${ACCOUNT}, applications, *, */*, allow\\np, role:${ACCOUNT}, applicationsets, *, */*, allow\\np, role:${ACCOUNT}, projects, get, *, allow\\np, role:${ACCOUNT}, logs, get, */*, allow\\np, role:${ACCOUNT}, exec, create, */*, allow\\ng, ${ACCOUNT}, role:${ACCOUNT}\\n\"}}"
 kubectl rollout restart -n "${NAMESPACE}" deployment/argocd-server
 kubectl rollout status -n "${NAMESPACE}" deployment/argocd-server --timeout=300s
 
 echo "==> Port-forwarding argocd-server to localhost:${LOCAL_PORT}"
-kubectl port-forward -n "${NAMESPACE}" svc/argocd-server "${LOCAL_PORT}:443" >/dev/null 2>&1 &
+# kubectl port-forward drops its connection on longer runs -- it is a single TCP
+# tunnel with no recovery. A multi-minute integration suite will outlive it, and every
+# request after the drop fails with an opaque TLS error that looks like a client bug.
+# Supervise it so the tunnel comes back instead.
+(
+    while true; do
+        kubectl port-forward -n "${NAMESPACE}" svc/argocd-server "${LOCAL_PORT}:443" >/dev/null 2>&1 || true
+        sleep 1
+    done
+) &
 PORT_FORWARD_PID=$!
 if [ "${PERSIST_PORT_FORWARD}" != "true" ]; then
-    trap 'kill "${PORT_FORWARD_PID}" 2>/dev/null || true' EXIT
+    # Kill the supervisor and whatever kubectl it currently owns.
+    trap 'kill "${PORT_FORWARD_PID}" 2>/dev/null || true; pkill -f "port-forward.*${LOCAL_PORT}:443" 2>/dev/null || true' EXIT
 fi
-sleep 5
+
+# Wait for the tunnel to actually answer rather than guessing at a sleep.
+for _ in $(seq 1 30); do
+    if curl -sk --max-time 2 "https://localhost:${LOCAL_PORT}/api/version" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
 
 ADMIN_PASSWORD=$(kubectl get secret -n "${NAMESPACE}" argocd-initial-admin-secret \
     -o jsonpath='{.data.password}' | base64 -d)

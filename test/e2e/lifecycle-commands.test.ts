@@ -17,6 +17,7 @@ interface Scenario {
     managedResources?: unknown;
     actions?: unknown;
     logBody?: string;
+    treeNodes?: unknown[];
     rollbackStatus?: number;
     rollbackBody?: unknown;
 }
@@ -79,7 +80,19 @@ beforeAll(async () => {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(scenario.logBody ?? '');
             } else if (url.includes('/resource-tree')) {
-                json(200, { nodes: [] });
+                // The action command reads version and namespace from here, because both
+                // are required by the API but neither is in the user's resource input.
+                json(200, {
+                    nodes: scenario.treeNodes ?? [
+                        {
+                            group: 'apps',
+                            kind: 'Deployment',
+                            name: 'payments-api',
+                            namespace: 'payments',
+                            version: 'v1',
+                        },
+                    ],
+                });
             } else if (url.includes('/operation')) {
                 json(200, {});
             } else if (url.includes('/api/v1/applications/')) {
@@ -217,13 +230,42 @@ describe('action', () => {
         scenario = {};
         await run({
             command: 'action',
-            resource: 'apps:Deployment:api',
+            resource: 'apps:Deployment:payments-api',
             action: 'scale',
             actionParameters: 'replicas=3',
             publishSummary: 'false',
         });
         const call = requests.find((r) => r.method === 'POST');
         expect(JSON.parse(call!.body).resourceActionParameters).toEqual([{ name: 'replicas', value: '3' }]);
+    });
+
+    it('names the alternatives when the resource is not in the application', async () => {
+        // version and namespace are resolved from the resource tree, so a resource that
+        // is not managed by the application cannot be acted on -- say which ones are.
+        scenario = { treeNodes: [{ group: 'apps', kind: 'Deployment', name: 'something-else', namespace: 'x', version: 'v1' }] };
+        const { stdout } = await run({
+            command: 'action',
+            resource: 'apps:Deployment:payments-api',
+            action: 'restart',
+            publishSummary: 'false',
+        });
+        expect(stdout).toContain('##vso[task.complete result=Failed');
+        expect(stdout).toContain('is not managed by application');
+        expect(stdout).toContain('apps:Deployment:something-else');
+    });
+
+    it('sends the resolved version and namespace with the action', async () => {
+        scenario = {};
+        await run({
+            command: 'action',
+            resource: 'apps:Deployment:payments-api',
+            action: 'restart',
+            publishSummary: 'false',
+        });
+        const call = requests.find((r) => r.method === 'POST');
+        const body = JSON.parse(call!.body) as { version: string; namespace: string };
+        expect(body.version).toBe('v1');
+        expect(body.namespace).toBe('payments');
     });
 
     it('requires a resource', async () => {

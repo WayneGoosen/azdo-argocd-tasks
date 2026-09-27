@@ -2,7 +2,10 @@
 //
 // These are deliberately abstract: no Argo logo, no Argo mark. "ARGO" is a registered
 // trademark of The Linux Foundation, and this project uses the name nominatively only.
-// Replace with real artwork before the first public publish.
+//
+// The real icons are now in place, so this SKIPS any icon that already exists. Running it
+// by accident must not clobber real artwork. Pass --force only to regenerate placeholders
+// deliberately (e.g. when adding a new task before its icon is drawn).
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -96,7 +99,13 @@ const taskIcons = fs.existsSync(tasksDir)
 
 const targets = [{ file: path.join(ROOT, 'images', 'extension-icon.png'), size: 128 }, ...taskIcons];
 
+const force = process.argv.includes('--force');
+
 for (const { file, size } of targets) {
+    if (fs.existsSync(file) && !force) {
+        console.log(`kept ${path.relative(ROOT, file)} (already exists; --force to overwrite)`);
+        continue;
+    }
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, makeIcon(size));
     console.log(`wrote ${path.relative(ROOT, file)} (${size}x${size})`);

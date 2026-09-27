@@ -30,3 +30,8 @@ internal/
 # (canonical copies live in marketplace/images/).
 site/
 docs/assets/images/
+
+# Scratch screenshots dropped at the repo root during dev and testing.
+# Marketing-ready screenshots belong in marketplace/images/ and are tracked.
+/*.png
+/Screenshot*
