@@ -4,7 +4,7 @@ domain: waynegoosen
 status: In development
 priority: P2
 stage: pre-release
-updated: 2026-09-25
+updated: 2026-09-27
 repo: https://github.com/WayneGoosen/azdo-argocd-tasks.git
 ---
 
@@ -17,19 +17,23 @@ things that will bite you. Written so it can be picked up cold.
 
 ## 🎯 Now — active focus
 
-- [ ] **Commit and push.** 147 files, one commit, nothing pushed. Everything below exists only on
-      one machine, and no CI workflow has ever executed.
+**Going public.** The repo is public, Pages is live, and the manifest is flipped. Two things
+stand between here and a listing:
+
+- [ ] **Get the publisher verified** by Microsoft. Account-level, nothing to do with the code.
+      An unverified publisher cannot list publicly whatever the manifest says.
+- [ ] **Capture screenshots** into `marketplace/images/` and declare them in
+      `vss-extension.json`. `.github/RELEASING.md` has the shot list and the JSON snippet.
+      `pr.yml` warns rather than fails while they are absent.
 
 ## ⏭️ Next — committed pipeline
 
-- [ ] **Run the integration matrix.** `integration.yml` + `scripts/kind-argocd.sh` are written and
-      wired up but have **never run**. Until they do, "verified against Argo CD 3.3/3.4/3.5" is a
-      claim about the *spec*, not the servers.
-- [ ] **Tag `v1.0.0`.** GitVersion has no anchor; without one it counts from repo init and
-      produces absurd versions.
-- [ ] **Enable GitHub Pages** — Settings → Pages → Build and deployment → GitHub Actions.
-- [ ] **Publish**: real icons, marketplace screenshots, verified publisher, flip `"public": true`.
-      The first publish must be manual through the Marketplace UI to create the extension record.
+- [ ] **First publish is manual** through <https://marketplace.visualstudio.com/manage>, to
+      create the extension record. `marketplace-publish.yml` can only *update* one that exists,
+      and it has never run — so no production version is burned yet.
+- [ ] **Re-run the integration matrix.** The last CI run surfaced three real harness bugs
+      (`$HOME` unset, Redis not ready, the guestbook fixture never synced). All fixed; the
+      green run that proves it has not happened yet.
 
 ## 💡 Later — backlog
 
@@ -55,9 +59,9 @@ things that will bite you. Written so it can be picked up cold.
 
 | | |
 |---|---|
-| **Nothing is pushed** | No CI has run. The integration matrix — the only verification against real servers — is unproven. |
-| **Verified publisher** | Required by Microsoft before an extension can be listed publicly. Needs your account. |
-| **Icons and screenshots** | Placeholders only. Deliberately abstract: "ARGO" is a Linux Foundation trademark, so no Argo mark. |
+| **Verified publisher** | Required by Microsoft before an extension can be listed publicly. Needs your account. The only hard blocker. |
+| **No screenshots** | The listing will render without images until `marketplace/images/` has some. Shot list in `.github/RELEASING.md`. |
+| **Integration matrix unproven** | Fixes for the three bugs the first run found are in, but no green run yet. |
 | **`internal/prd.md` is gitignored** | The original architecture research exists only on this machine. Move it somewhere tracked if it should survive. |
 
 ### Dated commitments
@@ -145,9 +149,11 @@ auth. A half-tested credential-rotation task is worse than the documented step i
 
 ## Health
 
-- **Last commit:** 2026-09-23 (1 commit total — the initial import)
-- **Unpushed:** 0 ahead, but **147 files uncommitted**
-- **Working tree:** uncommitted changes
-- **Tests:** 456 passing, 30 integration skipped (no live server)
-- **Build:** 6 task bundles, each self-contained, 556 KiB VSIX
+- **Last commit:** 2026-09-27 `b89965c` — releases tagged through `v1.0.3`
+- **Visibility:** repo public; Pages live at <https://waynegoosen.github.io/azdo-argocd-tasks/>
+  (redirects to the account's `waynegoosen.com` custom domain)
+- **Marketplace:** `"public": true`, **nothing published yet** — `marketplace-publish.yml` has
+  never run, so no production version is spent
+- **Tests:** 469 passing, 28 integration skipped (no live server)
+- **Build:** 6 task bundles, each self-contained, 576 KiB VSIX
 - **Docs:** `mkdocs build --strict` clean

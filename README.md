@@ -341,8 +341,8 @@ contract test, so an upstream breaking change fails CI rather than a deployment.
 
 ## Roadmap
 
-- **Done**: six tasks. PRD Phases 1-3 complete.
-- **Next**: publishing — real icons, screenshots and a verified publisher.
+- **Done**: six tasks. PRD Phases 1-3 complete. Icons shipped, manifest flipped public.
+- **Next**: publishing — marketplace screenshots and a verified publisher.
 - **Later**: Phase 4 (clusters, repositories, certificates, GPG keys, Argo Rollouts).
 
 Current state, outstanding work, dated commitments, gotchas, and the reasoning behind everything
@@ -352,7 +352,7 @@ deliberately *not* built is in [`STATUS.md`](STATUS.md).
 
 ```sh
 npm ci
-npm test          # 456 unit, contract and end-to-end tests
+npm test          # 469 unit, contract and end-to-end tests
 npm run build     # esbuild bundle per task into dist/
 npm run package   # build a .vsix
 ```

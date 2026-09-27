@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "publisher": "WayneGoosen",
     "description": "Sync, wait on, diff and report Argo CD applications from Azure Pipelines, over the Argo CD REST API. No CLI download required.",
-    "public": false,
+    "public": true,
     "targets": [
         {
             "id": "Microsoft.VisualStudio.Services"
