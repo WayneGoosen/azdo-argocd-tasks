@@ -156,6 +156,19 @@ Non-obvious facts that cost real time to find. All verified against the Argo CD 
 - **Deleting an ApplicationSet deletes every Application it generated** unless
   `preserveResourcesOnDeletion` is set.
 - **Project token deletion returns HTTP 200 even when it deleted nothing.** Verify by re-reading.
+- **`it.each(...)` arguments are evaluated at COLLECTION, before any `beforeAll`.** The
+  bundle-hygiene suite generated its cases from `dist/`, built in its own `beforeAll` — which
+  runs too late. On a clean checkout the list came back empty, `it.each([])` registered **zero
+  tests**, and the file *passed*. The suite that guards against dependency leakage could vanish
+  from a run with CI still green. Fixed with a vitest `globalSetup` that builds once before
+  collection, plus a `generated a case for every task` assertion on the collection-time
+  snapshot. That assertion has to read the captured list, not re-read `dist/`: `beforeAll`
+  repairs the directory before any test body runs, so a fresh read looks healthy while the
+  generated cases are already gone.
+- **`npm test` builds its own fixtures, and parallel workers raced to do it.** Several e2e files
+  each called `ensureBuilt()`, so on a clean checkout one worker could spawn a bundle another
+  was midway through writing — surfacing as a task with completely empty stdout, only in CI.
+  Same `globalSetup` fix. Locally it never reproduced because `dist/` was already fresh.
 - **Barrel exports leak dependencies into every bundle.** Adding a YAML module to task-common's
   barrel pulled js-yaml into four tasks that never parse YAML. The packages are marked
   `sideEffects: false`; `test/manifest/bundle-hygiene.test.ts` guards it.
