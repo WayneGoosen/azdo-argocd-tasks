@@ -68,4 +68,5 @@ nav:
   - Task inputs: task-inputs.md
   - Security: security.md
   - Token rotation: token-rotation.md
+  - Terraform: terraform.md
   - Zero-secret auth (research): dex-token-exchange.md

@@ -28,6 +28,8 @@ export interface AppSnapshot {
     operationPhase?: OperationPhase | undefined;
     operationMessage?: string | undefined;
     revision?: string | undefined;
+    /** One per source; a multi-source app has several. */
+    revisions?: string[] | undefined;
 }
 
 export type WaitOutcome = 'satisfied' | 'timedOut' | 'failed';

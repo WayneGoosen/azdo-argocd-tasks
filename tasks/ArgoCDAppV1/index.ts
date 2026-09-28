@@ -137,6 +137,10 @@ function publishOutputs(
         setOutput(OutputNames.SYNC_STATUS, single.syncStatus ?? 'Unknown');
         setOutput(OutputNames.HEALTH_STATUS, single.healthStatus ?? 'Unknown');
         setOutput(OutputNames.REVISION, single.revision ?? '');
+        // A multi-source app has one revision per source, of differing kinds -- a Helm chart
+        // version alongside a git SHA. Joined into `revision` they cannot be told apart, so
+        // the list is published too.
+        setOutput(OutputNames.REVISIONS, JSON.stringify(single.revisions ?? []));
         setOutput(OutputNames.OPERATION_PHASE, single.operationPhase ?? '');
         setOutput(OutputNames.OPERATION_MESSAGE, single.operationMessage ?? '');
         setOutput(OutputNames.APP_URL, applicationUrl(serverUrl, single.name, single.namespace));

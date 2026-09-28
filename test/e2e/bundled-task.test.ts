@@ -149,6 +149,39 @@ describe('bundled ArgoCDApp task', () => {
         expect(requests[0]?.authorization).toBe(`Bearer ${TOKEN}`);
     });
 
+    it('publishes the revision of a multi-source application', async () => {
+        // A multi-source app (spec.sources) gets status.sync.revisions[]; the singular
+        // status.sync.revision is present and EMPTY. Reading only the singular published
+        // an empty revision output for every such app.
+        resetScenario({
+            applications: [
+                {
+                    metadata: { name: 'payments', namespace: 'argocd' },
+                    spec: { project: 'payments' },
+                    status: {
+                        sync: { status: 'Synced', revision: '', revisions: ['a'.repeat(40), 'b'.repeat(40)] },
+                        health: { status: 'Healthy' },
+                    },
+                },
+            ],
+        });
+
+        const { stdout } = await runAppTask({
+            command: 'get',
+            applications: 'payments',
+            project: 'payments',
+            publishSummary: 'false',
+        });
+
+        expect(outputVariable(stdout, 'revision')).toBe(`${'a'.repeat(40)},${'b'.repeat(40)}`);
+        expect(
+            JSON.parse(outputVariable(stdout, 'revisions') as string),
+            'the list must be published so a chart version can be told from a SHA',
+        ).toEqual(['a'.repeat(40), 'b'.repeat(40)]);
+        const apps = JSON.parse(outputVariable(stdout, 'appsJson') as string) as Array<{ revision?: string }>;
+        expect(apps[0]?.revision, 'appsJson must carry it too').toBe(`${'a'.repeat(40)},${'b'.repeat(40)}`);
+    });
+
     it('sends the project parameter so errors stay meaningful', async () => {
         resetScenario({ applications: [application({})] });
         await runAppTask({ command: 'get', applications: 'payments', project: 'payments', publishSummary: 'false' });

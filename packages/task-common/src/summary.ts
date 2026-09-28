@@ -3,7 +3,7 @@
 // Pure string building, no I/O, so it snapshots cleanly in tests. The caller writes the
 // result to a file and publishes it with ##vso[task.uploadsummary].
 
-import { ResourceDiff, ResourceNode, RevisionHistory } from '@azdo-argocd/argocd-client';
+import { ResourceDiff, ResourceNode, RevisionHistory, revisionOf } from '@azdo-argocd/argocd-client';
 import { renderUnified, stateToLines } from './diff';
 import { applicationUrl } from './urls';
 import { AppSnapshot } from './wait';
@@ -146,7 +146,7 @@ export function renderHistoryTable(entries: readonly RevisionHistory[]): string 
         .sort((a, b) => Number(b.id ?? 0) - Number(a.id ?? 0))
         .map((entry) => {
             const source = entry.source?.chart ?? entry.source?.path ?? '-';
-            return `| ${entry.id ?? '?'} | \`${shortRevision(entry.revision)}\` | ${
+            return `| ${entry.id ?? '?'} | \`${shortRevision(revisionOf(entry))}\` | ${
                 entry.deployedAt ?? '-'
             } | ${source} |`;
         });

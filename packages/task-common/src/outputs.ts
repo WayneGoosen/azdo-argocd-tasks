@@ -13,6 +13,7 @@ export const OutputNames = {
     SYNC_STATUS: 'syncStatus',
     HEALTH_STATUS: 'healthStatus',
     REVISION: 'revision',
+    REVISIONS: 'revisions',
     OPERATION_PHASE: 'operationPhase',
     OPERATION_MESSAGE: 'operationMessage',
     APP_URL: 'appUrl',

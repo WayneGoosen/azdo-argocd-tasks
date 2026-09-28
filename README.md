@@ -1,10 +1,15 @@
 # Argo CD Pipeline Tasks
 
+[![Azure DevOps Marketplace](https://img.shields.io/badge/Marketplace-View%20extension-0078D4?logo=visualstudio)](https://marketplace.visualstudio.com/items?itemName=WayneGoosen.argocd-pipeline-tasks)
+[![Main](https://github.com/WayneGoosen/azdo-argocd-tasks/actions/workflows/main.yml/badge.svg)](https://github.com/WayneGoosen/azdo-argocd-tasks/actions/workflows/main.yml)
+[![Integration](https://github.com/WayneGoosen/azdo-argocd-tasks/actions/workflows/integration.yml/badge.svg)](https://github.com/WayneGoosen/azdo-argocd-tasks/actions/workflows/integration.yml)
+[![License](https://img.shields.io/github/license/WayneGoosen/azdo-argocd-tasks)](LICENSE)
+
 Azure Pipelines tasks for [Argo CD](https://argo-cd.readthedocs.io) that talk to the Argo CD
 REST API directly — no CLI download, no gRPC, no 240 MB per pipeline run.
 
-> **Status: 1.0.0, not yet published.** All three Phase 1 tasks are complete and tested.
-> See the [roadmap](#roadmap).
+> **Live on the Marketplace.** [Install it](https://marketplace.visualstudio.com/items?itemName=WayneGoosen.argocd-pipeline-tasks) — six tasks, PRD Phases 1-3 complete and
+> tested against live Argo CD 3.3, 3.4 and 3.5. See the [roadmap](#roadmap).
 
 **Documentation: [waynegoosen.github.io/azdo-argocd-tasks](https://waynegoosen.github.io/azdo-argocd-tasks/)**
 
@@ -26,7 +31,8 @@ This extension calls the Argo CD REST gateway over ordinary HTTPS instead:
 
 ## Quick start
 
-Add an **Argo CD** service connection (Project settings → Service connections), then:
+Add an **Argo CD** service connection (Project settings → Service connections), or
+[create it with Terraform](https://waynegoosen.github.io/azdo-argocd-tasks/terraform/), then:
 
 ```yaml
 - task: ArgoCDApp@1
@@ -220,15 +226,25 @@ Every command sets `appsJson`; single-application runs also set scalars.
 ```yaml
 - task: ArgoCDApp@1
   displayName: Read application status
-  name: argocd
-  inputs: { connection: 'argocd-prod', command: 'get', applications: 'payments-api', project: 'payments' }
+  name: argocd                    # ← required, see below
+  inputs:
+    connection: 'argocd-prod'
+    command: 'get'
+    applications: 'payments-api'
+    project: 'payments'
 
 - script: echo "Health is $(argocd.healthStatus) at $(argocd.revision)"
 ```
 
+**The step `name` is not optional here.** Without it Azure DevOps assigns a generated reference
+name — `ArgoCDApp1`, `ArgoCDApp2` — and `$(argocd.healthStatus)` resolves to nothing, with no
+warning. `env | grep -i argocd` in the next step shows which prefix the variables actually landed
+under.
+
 | Variable | Notes |
 |---|---|
-| `syncStatus`, `healthStatus`, `revision` | Single-application runs |
+| `syncStatus`, `healthStatus`, `revision` | Single-application runs. Multi-source apps get all revisions, comma-separated. |
+| `revisions` | JSON array, one entry per source. A Helm chart source reports a chart version, not a SHA. |
 | `operationPhase`, `operationMessage`, `appUrl` | Single-application runs |
 | `appsJson` | JSON array covering every application acted on |
 | `hasDiff`, `diffResourceCount` | `diff` command only |
@@ -341,8 +357,8 @@ contract test, so an upstream breaking change fails CI rather than a deployment.
 
 ## Roadmap
 
-- **Done**: six tasks. PRD Phases 1-3 complete. Icons shipped, manifest flipped public.
-- **Next**: publishing — marketplace screenshots and a verified publisher.
+- **Done**: six tasks, PRD Phases 1-3 complete, published to the Marketplace.
+- **Next**: screenshots on the listing, and a fix release for multi-source `revision`.
 - **Later**: Phase 4 (clusters, repositories, certificates, GPG keys, Argo Rollouts).
 
 Current state, outstanding work, dated commitments, gotchas, and the reasoning behind everything
@@ -352,7 +368,7 @@ deliberately *not* built is in [`STATUS.md`](STATUS.md).
 
 ```sh
 npm ci
-npm test          # 469 unit, contract and end-to-end tests
+npm test          # 477 unit, contract and end-to-end tests
 npm run build     # esbuild bundle per task into dist/
 npm run package   # build a .vsix
 ```

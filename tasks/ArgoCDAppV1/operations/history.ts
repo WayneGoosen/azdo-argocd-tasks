@@ -5,7 +5,7 @@
 // spec.revisionHistoryLimit (default 10), so an empty result can mean "never synced"
 // rather than "no data".
 
-import { RevisionHistory } from '@azdo-argocd/argocd-client';
+import { RevisionHistory, revisionOf } from '@azdo-argocd/argocd-client';
 import { renderHistorySummary } from '@azdo-argocd/task-common';
 import { OperationContext, OperationOutcome, resolveApplications, toSnapshot } from './context';
 
@@ -68,7 +68,7 @@ export async function runHistory(ctx: OperationContext): Promise<OperationOutcom
 
         console.log(`${ref.name}: ${entries.length} history entr${entries.length === 1 ? 'y' : 'ies'}`);
         for (const entry of entries) {
-            console.log(`  ${entry.id}  ${entry.revision ?? '-'}  ${entry.deployedAt ?? '-'}`);
+            console.log(`  ${entry.id}  ${revisionOf(entry) ?? '-'}  ${entry.deployedAt ?? '-'}`);
         }
 
         summaries.push(

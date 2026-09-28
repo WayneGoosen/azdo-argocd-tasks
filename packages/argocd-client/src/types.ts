@@ -384,3 +384,46 @@ export interface ApplicationSetList {
 export interface ApplicationSetGenerateResponse {
     applications?: Application[];
 }
+
+/**
+ * Every revision the object carries, one per application source.
+ *
+ * Argo CD writes the revision into ONE of two fields depending on the application's shape,
+ * and leaves the other empty:
+ *
+ *   - single-source app (`spec.source`)   -> `revision`  (a string)
+ *   - multi-source app  (`spec.sources`)  -> `revisions` (one entry per source, in order)
+ *
+ * Both fields exist on `status.sync`, `status.operationState.syncResult` and every
+ * `status.history[]` entry -- see v1alpha1SyncStatus, v1alpha1SyncOperationResult and
+ * v1alpha1RevisionHistory in vendor/swagger/argocd.json. Reading only the singular means
+ * every multi-source application reports an empty revision, with nothing to indicate why.
+ *
+ * The plural wins when both are set: for a multi-source app the singular can only ever hold
+ * one of several, so preferring it would silently drop the rest.
+ *
+ * Entries are NOT all git SHAs. A Helm chart source reports its chart version, so the common
+ * "chart from a registry + values from a repo" application yields something like
+ * `["1.2.3", "<sha>"]`.
+ */
+export function revisionsOf(value: { revision?: string; revisions?: string[] } | undefined): string[] {
+    if (value === undefined) {
+        return [];
+    }
+    const many = (value.revisions ?? []).filter((r) => r !== undefined && r !== '');
+    if (many.length > 0) {
+        return many;
+    }
+    return value.revision !== undefined && value.revision !== '' ? [value.revision] : [];
+}
+
+/**
+ * The deployed revision as a single string, comma-separated for a multi-source application.
+ *
+ * Use `revisionsOf` when the individual values matter -- see the note there about Helm chart
+ * sources reporting a chart version rather than a SHA.
+ */
+export function revisionOf(value: { revision?: string; revisions?: string[] } | undefined): string | undefined {
+    const many = revisionsOf(value);
+    return many.length === 0 ? undefined : many.join(',');
+}

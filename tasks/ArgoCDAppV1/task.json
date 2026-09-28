@@ -653,6 +653,10 @@
             "description": "Revision the application is running."
         },
         {
+            "name": "revisions",
+            "description": "Every revision the application is synced to, as a JSON array \u2014 one entry per source. A multi-source application has several, and they are not all git SHAs: a Helm chart source reports its chart version. Single-application runs only."
+        },
+        {
             "name": "operationPhase",
             "description": "Phase of the most recent operation."
         },
@@ -735,6 +739,7 @@
                 "syncStatus",
                 "healthStatus",
                 "revision",
+                "revisions",
                 "operationPhase",
                 "operationMessage",
                 "appUrl",

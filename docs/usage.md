@@ -198,9 +198,73 @@ Give the step a `name` and reference them as `$(stepName.variable)`:
 - task: ArgoCDApp@1
   displayName: Read application status
   name: argocd
-  inputs: { connection: 'argocd-prod', command: 'get', applications: 'payments-api', project: 'payments' }
+  inputs:
+    connection: 'argocd-prod'
+    command: 'get'
+    applications: 'payments-api'
+    project: 'payments'
 
 - script: echo "Health is $(argocd.healthStatus) at $(argocd.revision)"
 ```
+
+`name` is what makes this work, and it is easy to miss. Without it the task still runs and still
+sets its outputs, but Azure DevOps assigns the step a **generated** reference name — `ArgoCDApp1`
+for the first such step, `ArgoCDApp2` for the next — so `$(argocd.healthStatus)` resolves to
+nothing. No warning is logged.
+
+If you are debugging this, dump the environment in the following step. Output variables appear as
+`<REFERENCE_NAME>_<VARIABLE>`, upper-cased:
+
+```yaml
+- bash: env | grep -i argocd | sort
+```
+
+Seeing `ARGOCDAPP1_HEALTHSTATUS` rather than `ARGOCD_HEALTHSTATUS` means the step had no `name`,
+and the variables are there under the generated prefix.
+
+Two further constraints, both Azure DevOps behaviour rather than anything this task controls:
+
+- **Only later steps can read them.** A variable set by a step is not visible to that same step.
+- **Across jobs or stages you need the long form**, plus an explicit `dependsOn`:
+
+```yaml
+- job: verify
+  dependsOn: deploy
+  variables:
+    health: $[ dependencies.deploy.outputs['argocd.healthStatus'] ]
+  steps:
+    - script: echo "Health was $(health)"
+```
+
+Note the task's step name (`argocd`) and the output name are one quoted string inside the
+brackets, and `$[ ]` is not interchangeable with `$( )` here.
+
+### `revision` on multi-source applications
+
+For an application with several sources (`spec.sources`), Argo CD reports one revision per source
+and `revision` holds them comma-separated, in source order.
+
+They are **not all git SHAs**. A Helm chart source reports its *chart version*, so the common
+"chart from a registry, values from a repo" application produces something like
+`1.2.3,4f9a2c…`. Joined together those cannot be told apart, so the list is also published as
+`revisions`, a JSON array:
+
+```yaml
+- task: ArgoCDApp@1
+  displayName: Read application status
+  name: argocd
+  inputs:
+    connection: 'argocd-prod'
+    command: 'get'
+    applications: 'payments-api'
+    project: 'payments'
+
+- bash: |
+    chart=$(echo '$(argocd.revisions)' | jq -r '.[0]')   # the Helm chart version
+    values=$(echo '$(argocd.revisions)' | jq -r '.[1]')  # the values repo commit
+    echo "chart $chart, values $values"
+```
+
+Entries are positional and follow the order of `spec.sources`.
 
 The full list is in the [task inputs reference](task-inputs.md).

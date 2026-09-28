@@ -4,7 +4,7 @@
 // their current state, and -- when something fails -- the unhealthy resources behind it.
 
 import * as tl from 'azure-pipelines-task-lib/task';
-import { Application, ArgoCdClient, ResourceNode } from '@azdo-argocd/argocd-client';
+import { Application, ArgoCdClient, ResourceNode, revisionOf, revisionsOf } from '@azdo-argocd/argocd-client';
 import { AppSnapshot, Decision } from '@azdo-argocd/task-common';
 import { ApplicationRef, CommonInputs } from '../inputs';
 
@@ -21,6 +21,10 @@ export interface OperationOutcome {
     extraOutputs: Record<string, string>;
 }
 
+function nonEmpty(values: string[]): string[] | undefined {
+    return values.length === 0 ? undefined : values;
+}
+
 export function toSnapshot(app: Application, fallbackName: string): AppSnapshot {
     const status = app.status;
     return {
@@ -31,7 +35,8 @@ export function toSnapshot(app: Application, fallbackName: string): AppSnapshot 
         healthMessage: status?.health?.message,
         operationPhase: status?.operationState?.phase,
         operationMessage: status?.operationState?.message,
-        revision: status?.operationState?.syncResult?.revision ?? status?.sync?.revision,
+        revision: revisionOf(status?.operationState?.syncResult) ?? revisionOf(status?.sync),
+        revisions: nonEmpty(revisionsOf(status?.operationState?.syncResult)) ?? revisionsOf(status?.sync),
     };
 }
 

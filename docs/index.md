@@ -3,8 +3,8 @@
 Azure Pipelines tasks for [Argo CD](https://argo-cd.readthedocs.io) that talk to the Argo CD
 REST API directly — no CLI download, no gRPC, no 240 MB per pipeline run.
 
-!!! note "Pre-release"
-    Version 1.0.0 is built and tested but not yet published to the Marketplace.
+!!! tip "Available on the Marketplace"
+    [Install the extension](https://marketplace.visualstudio.com/items?itemName=WayneGoosen.argocd-pipeline-tasks) — six tasks, tested against live Argo CD 3.3, 3.4 and 3.5.
 
 ## Why this exists
 

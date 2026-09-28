@@ -17,33 +17,44 @@ things that will bite you. Written so it can be picked up cold.
 
 ## 🎯 Now — active focus
 
-**Going public.** The repo is public, Pages is live, and the manifest is flipped. Two things
-stand between here and a listing:
+**Published.** `WayneGoosen.argocd-pipeline-tasks` **v1.0.5** is live, validated and public since
+2026-09-27 21:25 UTC. Verified from the published VSIX: endpoint type `argocdrest` throughout,
+six task contributions.
 
-- [ ] **Free the `ARGOCD` endpoint name, or confirm we no longer need it.** The 1.0.4 publish
-      was rejected because something already holds it — almost certainly the private dev
-      extension uploaded by hand to test in the org. Production now declares `argocdrest`
-      instead, so this no longer blocks, but the stale private extension is worth removing at
-      <https://marketplace.visualstudio.com/manage>.
-- [ ] **Recreate the Argo CD service connection** in the test org after installing a build with
-      the renamed endpoint type. The old connection is bound to the old type and will not
-      appear in the picker.
-- [ ] **Get the publisher verified** by Microsoft. Account-level, nothing to do with the code.
-      An unverified publisher cannot list publicly whatever the manifest says.
+- [ ] **Ship 1.0.6 with the multi-source `revision` fix.** 1.0.5 has the bug — confirmed by
+      grepping the published bundle, `revisions` appears nowhere in it. Every multi-source
+      application on the live extension publishes an empty `revision`.
 - [ ] **Capture screenshots** into `marketplace/images/` and declare them in
-      `vss-extension.json`. `.github/RELEASING.md` has the shot list and the JSON snippet.
-      `pr.yml` warns rather than fails while they are absent.
+      `vss-extension.json`. The published 1.0.5 has **no** `Screenshots.N` asset, so the listing
+      renders imageless. `.github/RELEASING.md` has the shot list and the JSON snippet.
+- [ ] **Recreate the Argo CD service connection** in the test org. Anything created before the
+      rename is bound to the old type and will not appear in the picker.
 
 ## ⏭️ Next — committed pipeline
 
-- [ ] **First publish is manual** through <https://marketplace.visualstudio.com/manage>, to
-      create the extension record. `marketplace-publish.yml` can only *update* one that exists,
-      and it has never run — so no production version is burned yet.
+- [ ] **Subsequent publishes can use `marketplace-publish.yml`** now the extension record exists.
+      Tag, then run it with that tag.
 - [ ] **Re-run the integration matrix.** The last CI run surfaced three real harness bugs
       (`$HOME` unset, Redis not ready, the guestbook fixture never synced). All fixed; the
       green run that proves it has not happened yet.
 
 ## 💡 Later — backlog
+
+- **Make the run summary tab first-class.** `ArgoCDApp@1` already publishes a Markdown summary
+  (application table, sync/health icons, rendered diff) via `##vso[task.uploadsummary]`, but it is
+  undiscoverable and badly presented:
+  - **The tab is named after the file**, so it shows as `argocd-sync-1759012345678`
+    (`tasks/ArgoCDAppV1/index.ts:155`). `uploadSummary(file, title)` in
+    `packages/task-common/src/logging.ts:32` *takes* a title and never uses it — the parameter is
+    dead except in the error path. Fix: emit
+    `##vso[task.addattachment type=Distributedtask.Core.Summary;name=Argo CD;]<path>`, which sets
+    the displayed name explicitly.
+  - **Only `ArgoCDApp@1` publishes one.** `ArgoCDAppSet@1` (generated applications),
+    `ArgoCDProject@1` (roles and tokens) and `ArgoCDInstall@1` (resolved version, cache hit) all
+    have something worth showing.
+  - **Make the content much richer** — per-application links into the Argo CD UI, operation
+    timings, what changed since the previous revision, resource-level health breakdown.
+  - Worth documenting too: nothing in `docs/` currently mentions the summary exists.
 
 - **Phase 4**: `ArgoCDCluster@1`, `ArgoCDRepo@1` (repocreds, certificates, GPG keys), Argo Rollouts,
   `patch-resource`. Least validated demand in the PRD — worth waiting for a user to ask.
@@ -93,15 +104,39 @@ Non-obvious facts that cost real time to find. All verified against the Argo CD 
   reconstruct a spec from typed fields — mutate the parsed object in place. The narrow TS types are
   a compile-time view only; `JSON.parse` keeps everything. See
   `packages/task-common/src/spec-mutation.ts` and its no-field-loss test.
+- **Multi-source applications report `revisions[]`, not `revision`.** Argo CD fills `revision`
+  for a single-source app and `revisions` for a multi-source one, leaving the other **present and
+  empty** — on `status.sync`, on `operationState.syncResult` and on every `status.history[]` entry.
+  Because the empty string is present rather than missing, `a?.revision ?? b?.revision` never falls
+  through. This shipped: every multi-source app published an empty `revision` output and a blank
+  summary column, silently. Use `revisionOf()` from the client package; guarded by
+  `packages/argocd-client/test/multi-source-revision.test.ts` and an e2e test on the real bundle.
+  Note the entries are not homogeneous: a Helm chart source reports a **chart version**, so the
+  common chart-plus-values-repo app yields `["1.2.3", "<sha>"]`. Hence the separate `revisions`
+  output — joined into one string they cannot be told apart.
+- **A step with no `name` still gets a reference name — a generated one.** Azure DevOps assigns
+  `ArgoCDApp1`, `ArgoCDApp2`, … so output variables exist as `ARGOCDAPP1_HEALTHSTATUS` and
+  `$(argocd.healthStatus)` resolves to nothing with no warning. `env | grep -i argocd` in the next
+  step is the fastest diagnosis.
 - **Service endpoint type names are a Marketplace-GLOBAL namespace.** Not per-publisher, not
   per-extension. The first extension to publish a given name holds it, and every later
   extension declaring it is rejected at validation:
   `The Service Endpoint Contribution ...ServiceEndpointName.ARGOCD with Name ARGOCD already
-  exists`. This killed the 1.0.4 publish. The name is invisible to users — they only ever see
-  `displayName` and their own connection's name — so it costs nothing to make it distinctive:
-  ours is `argocdrest`. The dev build derives its own (`argocdrestdev`) in
-  `scripts/dev-overrides.mjs`, because a dev build holding the name blocks production.
-  Renaming it after publishing would orphan every user's existing service connection.
+  exists`. This killed the 1.0.4 publish. **`argocd` is held by `scb-tomasmortensen.vsix-argocd`**
+  ("Argo CD Extension", v0.1.0, published 2020-10-09, never updated, ~710 installs). It is not
+  reclaimable, so ours is `argocdrest`. The name is invisible to users — they only ever see
+  `displayName` and their own connection's name. The dev build derives its own
+  (`argocdrestdev`) in `scripts/dev-overrides.mjs`, because a dev build holding the name would
+  block production just as effectively. Renaming after publishing would orphan every user's
+  existing service connection.
+- **The public gallery text search does not find that extension.** Querying
+  `extensionquery` with `filterType: 10` (search text) for "argocd" returns zero results, which
+  led to a wrong diagnosis of who held the name. Direct lookup by `filterType: 7`
+  (`scb-tomasmortensen.vsix-argocd`) finds it immediately. **Never conclude a Marketplace name
+  is free from a text search.**
+- **`azuredevops_serviceendpoint_argocd` in the Terraform provider is not ours.** It sets
+  `Type = "argocd"` for that 2020 extension. Users of this extension need
+  `azuredevops_serviceendpoint_generic_v2` (provider >= 1.12.0) with `type = "argocdrest"`.
 - **The endpoint name lives in two places that must agree**: `properties.name` on the
   contribution, and `connectedService:<name>` in every `task.json`. A mismatch is not an error
   anywhere — the connection picker just comes up empty. Guarded by
@@ -173,8 +208,8 @@ auth. A half-tested credential-rotation task is worse than the documented step i
 - **Last commit:** 2026-09-27 `b89965c` — releases tagged through `v1.0.3`
 - **Visibility:** repo public; Pages live at <https://waynegoosen.github.io/azdo-argocd-tasks/>
   (redirects to the account's `waynegoosen.com` custom domain)
-- **Marketplace:** `"public": true`, **nothing published yet** — `marketplace-publish.yml` has
-  never run, so no production version is spent
-- **Tests:** 471 passing, 28 integration skipped (no live server)
+- **Marketplace:** **v1.0.5 live** (validated, public, 2 installs). 1.0.4 was rejected for the
+  endpoint-name collision; 1.0.0-1.0.4 are spent and can never be reused
+- **Tests:** 477 passing, 28 integration skipped (no live server)
 - **Build:** 6 task bundles, each self-contained, 576 KiB VSIX
 - **Docs:** `mkdocs build --strict` clean
