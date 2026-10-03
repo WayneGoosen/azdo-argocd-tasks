@@ -333,7 +333,10 @@ export async function renderRuns(refs: readonly AttachmentRef[], fetch: RunFetch
     };
 
     if (refs.length > 1) {
-        const select = el('select');
+        // The label needs `for` pointing at the select, or clicking it does not focus the
+        // control and a screen reader cannot derive the control's name.
+        const selectId = 'argocd-step-select';
+        const select = el('select', { attrs: { id: selectId } });
         refs.forEach((ref, index) => {
             select.appendChild(el('option', { text: ref.name, attrs: { value: String(index) } }));
         });
@@ -341,7 +344,7 @@ export async function renderRuns(refs: readonly AttachmentRef[], fetch: RunFetch
             current = refs[select.selectedIndex] as AttachmentRef;
             void show(current);
         });
-        bar.appendChild(el('label', { text: 'Step' }));
+        bar.appendChild(el('label', { text: 'Step', attrs: { for: selectId } }));
         bar.appendChild(select);
     }
 

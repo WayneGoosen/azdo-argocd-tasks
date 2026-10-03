@@ -45,6 +45,16 @@ describe('secretLeakIn', () => {
         expect(secretLeakIn('before super-secret-token after')).toContain('registered as a secret');
     });
 
+    it('catches a secret whose characters JSON escapes', () => {
+        // The attachment is checked AFTER JSON.stringify. A secret containing a quote or a
+        // backslash appears escaped in that payload, so a raw substring search misses it
+        // entirely and the secret is published. This is the exact bypass.
+        registerSecret('pa"ss\\word');
+        const payload = JSON.stringify({ note: 'token is pa"ss\\word' });
+        expect(payload).not.toContain('pa"ss\\word'); // proves the raw form is absent
+        expect(secretLeakIn(payload)).toContain('registered as a secret');
+    });
+
     it('catches a JWT that was never registered', () => {
         // The backstop: a token that arrived by some path that did not go through
         // registerSecret -- read back off an object, or from an endpoint nobody audited.

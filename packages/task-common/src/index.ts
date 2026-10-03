@@ -2,6 +2,7 @@ export * from './duration';
 export * from './token-id';
 export * from './artifacts';
 export * from './attachment';
+export * from './attachment-build';
 export * from './diff';
 export * from './endpoint';
 export * from './logging';

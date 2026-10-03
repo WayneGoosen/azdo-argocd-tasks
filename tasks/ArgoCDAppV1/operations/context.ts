@@ -38,6 +38,7 @@ export function toSnapshot(app: Application, fallbackName: string): AppSnapshot 
     return {
         name: app.metadata?.name ?? fallbackName,
         namespace: app.metadata?.namespace,
+        project: app.spec?.project,
         syncStatus: status?.sync?.status,
         healthStatus: status?.health?.status,
         healthMessage: status?.health?.message,

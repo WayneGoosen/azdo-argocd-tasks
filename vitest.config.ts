@@ -18,6 +18,10 @@ export default defineConfig({
                 // by importing them, so line coverage here measures nothing useful.
                 '**/index.ts',
                 '**/*.d.ts',
+                // `tasks/**/*.ts` in `include` also matches tasks/*/test/**. Counting test
+                // code as covered source inflates the number and flatters the quality gate.
+                '**/test/**',
+                '**/*.test.ts',
             ],
         },
     },

@@ -375,6 +375,41 @@ describe('bundled ArgoCDApp task', () => {
         expect(run?.applications?.[0]).toMatchObject({ name: 'payments', syncStatus: 'Synced', healthStatus: 'Healthy' });
     });
 
+    it('publishes the diff into the attachment, not just the Markdown summary', async () => {
+        // The tab's diff section is populated from here. Before this was wired, the section
+        // existed and rendered correctly from fixtures but was always empty in production.
+        resetScenario({
+            applications: [application({})],
+            managedResources: {
+                items: [
+                    {
+                        group: 'apps',
+                        kind: 'Deployment',
+                        namespace: 'prod',
+                        name: 'api',
+                        modified: true,
+                        liveState: JSON.stringify({ spec: { replicas: 2 } }),
+                        targetState: JSON.stringify({ spec: { replicas: 3 } }),
+                    },
+                    { kind: 'ConfigMap', name: 'unchanged', modified: false, liveState: '{}', targetState: '{}' },
+                ],
+            },
+        });
+
+        const { stdout } = await runAppTask({
+            command: 'diff',
+            applications: 'payments',
+            project: 'payments',
+            failOnDiff: 'false',
+            publishSummary: 'true',
+        });
+
+        const run = attachmentFrom(stdout) as { diffs?: Array<Record<string, unknown>> } | undefined;
+        expect(run?.diffs, 'the attachment carried no diffs').toHaveLength(1);
+        expect(run?.diffs?.[0]).toMatchObject({ group: 'apps', kind: 'Deployment', name: 'api' });
+        expect(String(run?.diffs?.[0]?.['patch'])).toContain('replicas');
+    });
+
     it('never puts the connection token in the attachment', async () => {
         // The attachment is a file we write and publish; the agent masks its log stream, not
         // this. The endpoint token is registered as a secret, so the guard must catch it.

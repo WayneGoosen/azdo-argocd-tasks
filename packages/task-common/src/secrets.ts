@@ -46,7 +46,12 @@ export function registerSecret(value: string | undefined): void {
  */
 export function secretLeakIn(content: string): string | undefined {
     for (const secret of registered) {
-        if (content.includes(secret)) {
+        // Check the RAW secret and its JSON-encoded form. The run attachment is checked
+        // after JSON.stringify, which escapes quotes, backslashes and control characters --
+        // so a secret containing any of them would not match raw and would be published.
+        // JSON.stringify wraps in quotes; slice them off to get the escaped body.
+        const encoded = JSON.stringify(secret).slice(1, -1);
+        if (content.includes(secret) || content.includes(encoded)) {
             return 'it contains a value that was registered as a secret';
         }
     }

@@ -17,9 +17,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Job level on purpose: a step's own `env:` is applied after its `if:` is evaluated,
-      # so a step-level SONAR_TOKEN would always read as empty in the condition below.
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # A BOOLEAN, not the secret. A step's own `env:` is applied after its `if:` is
+      # evaluated, so the condition needs something at job scope -- but putting the token
+      # itself here would hand it to every third-party action, npm lifecycle script and test
+      # step in the job. This exposes only whether it exists.
+      SONAR_CONFIGURED: ${{ secrets.SONAR_TOKEN != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -92,42 +94,46 @@ jobs:
       - name: Verify the task bundles
         run: |
           set -euo pipefail
-          node -e "
-            const fs = require('fs');
-            const path = require('path');
-            const builtins = new Set(require('module').builtinModules);
-            const tasksDir = 'dist/tasks';
-            let failed = false;
-            for (const task of fs.readdirSync(tasksDir)) {
-              const src = fs.readFileSync(path.join(tasksDir, task, 'index.js'), 'utf8');
+          # Quoted heredoc, NOT `node -e "..."`. The regex below contains double quotes, which
+          # close the shell's string and leave the following `(` bare -- a syntax error. This
+          # step had never actually run until the first pull request, so it shipped broken.
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const builtins = new Set(require('module').builtinModules);
+          const tasksDir = 'dist/tasks';
+          let failed = false;
+          for (const task of fs.readdirSync(tasksDir)) {
+            const src = fs.readFileSync(path.join(tasksDir, task, 'index.js'), 'utf8');
 
-              // Anything required at runtime that is not a Node builtin means the bundle is
-              // incomplete, and the task fails on an agent with a bare module error.
-              const required = [...src.matchAll(/require\("([^".\/][^"]*)"\)/g)].map(m => m[1]);
-              const external = [...new Set(required)].filter(m => !builtins.has(m.replace(/^node:/, '')));
-              if (external.length) {
-                console.error('::error::' + task + ' has unbundled runtime requires: ' + external.join(', '));
-                failed = true;
-              }
-
-              // azure-pipelines-task-lib holds module-level state (output streams, secret
-              // handling, resource strings). Two bundled copies split that state silently.
-              // azure-pipelines-tool-lib depends on task-lib too, so this is a live risk.
-              const copies = (src.match(/loading inputs and endpoints/g) || []).length;
-              if (copies !== 1) {
-                console.error('::error::' + task + ' bundles ' + copies + ' copies of azure-pipelines-task-lib (expected 1)');
-                failed = true;
-              }
-
-              console.log(task + ': ok (' + (fs.statSync(path.join(tasksDir, task, 'index.js')).size / 1024).toFixed(0) + ' KiB)');
+            // Anything required at runtime that is not a Node builtin means the bundle is
+            // incomplete, and the task fails on an agent with a bare module error.
+            const required = [...src.matchAll(/require\("([^".\/][^"]*)"\)/g)].map((m) => m[1]);
+            const external = [...new Set(required)].filter((m) => !builtins.has(m.replace(/^node:/, '')));
+            if (external.length) {
+              console.error('::error::' + task + ' has unbundled runtime requires: ' + external.join(', '));
+              failed = true;
             }
-            if (failed) process.exit(1);
-          "
+
+            // azure-pipelines-task-lib holds module-level state (output streams, secret
+            // handling, resource strings). Two bundled copies split that state silently.
+            const copies = (src.match(/loading inputs and endpoints/g) || []).length;
+            if (copies !== 1) {
+              console.error('::error::' + task + ' bundles ' + copies + ' copies of azure-pipelines-task-lib (expected 1)');
+              failed = true;
+            }
+
+            console.log(task + ': ok (' + (fs.statSync(path.join(tasksDir, task, 'index.js')).size / 1024).toFixed(0) + ' KiB)');
+          }
+          if (failed) process.exit(1);
+          NODE
 
       - name: SonarCloud
         # Skipped when SONAR_TOKEN is absent -- on forks, and before the SonarCloud project
         # is set up. `build` is a required check, so this must never be the reason it fails.
-        if: ${{ env.SONAR_TOKEN != '' }}
+        if: ${{ env.SONAR_CONFIGURED == 'true' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

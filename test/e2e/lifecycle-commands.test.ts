@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
-import { ensureBuilt, outputVariable, runTask, summaryPathFrom } from '../support/run-task';
+import { attachmentFrom, ensureBuilt, outputVariable, runTask, summaryPathFrom } from '../support/run-task';
 
 const TOKEN = 'lifecycle-token';
 
@@ -133,6 +133,12 @@ describe('history', () => {
         const markdown = fs.readFileSync(summary as string, 'utf8');
         expect(markdown).toContain('Deployment history');
         expect(markdown.indexOf('| 3 |')).toBeLessThan(markdown.indexOf('| 1 |'));
+
+        // The tab reads the attachment, not the Markdown. Both must carry the history, in
+        // the same order -- they are rendered from one conversion precisely so they agree.
+        const run_ = attachmentFrom(stdout) as { history?: Array<Record<string, unknown>> } | undefined;
+        expect(run_?.history, 'the attachment carried no history').toBeDefined();
+        expect(run_?.history?.map((h) => String(h['id']))).toEqual(['3', '2', '1']);
     });
 
     it('says so plainly when there is no history', async () => {

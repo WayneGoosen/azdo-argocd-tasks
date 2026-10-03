@@ -1,7 +1,7 @@
 // The `get` and `refresh` commands.
 
 import * as tl from 'azure-pipelines-task-lib/task';
-import { decideFromStatus, renderStatusSummary } from '@azdo-argocd/task-common';
+import { decideFromStatus, renderStatusSummary, toAttachmentResources } from '@azdo-argocd/task-common';
 import { OperationContext, OperationOutcome, fetchSnapshots, fetchUnhealthyNodes, resolveApplications } from './context';
 
 export async function runGet(ctx: OperationContext, refresh?: 'normal' | 'hard'): Promise<OperationOutcome> {
@@ -34,5 +34,6 @@ export async function runGet(ctx: OperationContext, refresh?: 'normal' | 'hard')
             unhealthyNodes,
         }),
         extraOutputs: {},
+        attachment: { unhealthy: toAttachmentResources(unhealthyNodes) },
     };
 }

@@ -71,6 +71,7 @@ function buildAttachment(
         applications: outcome.snapshots.map((s) => ({
             name: s.name,
             namespace: s.namespace,
+            project: s.project,
             syncStatus: s.syncStatus,
             healthStatus: s.healthStatus,
             healthMessage: s.healthMessage,
@@ -127,17 +128,22 @@ async function run(): Promise<void> {
     } catch (error) {
         const message = describeError(error);
         // The failure path is exactly when someone goes looking for the tab, so publish a
-        // minimal attachment before reporting the failure rather than leaving it empty.
+        // minimal attachment before reporting the failure rather than leaving it empty --
+        // but still honour publishSummary. Read it defensively: this catch also covers
+        // failures from before the inputs were parsed.
+        const mayPublish = tl.getInput('publishSummary', false) !== 'false';
         try {
-            publishRunAttachment({
-                schema: 1,
-                task: 'ArgoCDApp@1',
-                command: tl.getInput('command', false) ?? undefined,
-                startedAt,
-                finishedAt: new Date().toISOString(),
-                result: 'Failed',
-                error: message,
-            });
+            if (mayPublish) {
+                publishRunAttachment({
+                    schema: 1,
+                    task: 'ArgoCDApp@1',
+                    command: tl.getInput('command', false) ?? undefined,
+                    startedAt,
+                    finishedAt: new Date().toISOString(),
+                    result: 'Failed',
+                    error: message,
+                });
+            }
         } catch {
             /* Never let the attachment obscure the real failure below. */
         }

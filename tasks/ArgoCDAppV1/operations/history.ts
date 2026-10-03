@@ -6,7 +6,7 @@
 // rather than "no data".
 
 import { RevisionHistory, revisionOf } from '@azdo-argocd/argocd-client';
-import { renderHistorySummary } from '@azdo-argocd/task-common';
+import { AttachmentHistory, renderHistorySummary, toAttachmentHistory } from '@azdo-argocd/task-common';
 import { OperationContext, OperationOutcome, resolveApplications, toSnapshot } from './context';
 
 /** History entries newest first. `id` is an int64 upstream, so it may arrive as a string. */
@@ -52,6 +52,7 @@ export async function runHistory(ctx: OperationContext): Promise<OperationOutcom
 
     const summaries: string[] = [];
     const snapshots = [];
+    const history: AttachmentHistory[] = [];
     let latestHistoryId = '';
 
     for (const ref of refs) {
@@ -71,6 +72,8 @@ export async function runHistory(ctx: OperationContext): Promise<OperationOutcom
             console.log(`  ${entry.id}  ${revisionOf(entry) ?? '-'}  ${entry.deployedAt ?? '-'}`);
         }
 
+        history.push(...toAttachmentHistory(entries));
+
         summaries.push(
             renderHistorySummary({
                 applicationName: ref.name,
@@ -86,5 +89,6 @@ export async function runHistory(ctx: OperationContext): Promise<OperationOutcom
         snapshots,
         summary: summaries.join('\n\n---\n\n'),
         extraOutputs: latestHistoryId === '' ? {} : { latestHistoryId },
+        attachment: { history },
     };
 }

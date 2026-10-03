@@ -1,6 +1,6 @@
 // The `wait` command.
 
-import { decideFromWait, renderStatusSummary, waitForApplications } from '@azdo-argocd/task-common';
+import { decideFromWait, renderStatusSummary, toAttachmentResources, waitForApplications } from '@azdo-argocd/task-common';
 import { WaitInputs } from '../inputs';
 import { OperationContext, OperationOutcome, fetchSnapshots, fetchUnhealthyNodes, resolveApplications } from './context';
 
@@ -33,5 +33,6 @@ export async function runWait(ctx: OperationContext, waitInputs: WaitInputs): Pr
             footer: `Completed in ${Math.round(result.elapsedMs / 1000)}s over ${result.polls} poll(s).`,
         }),
         extraOutputs: {},
+        attachment: { unhealthy: toAttachmentResources(unhealthyNodes) },
     };
 }

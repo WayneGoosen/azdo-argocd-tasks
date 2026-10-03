@@ -26,9 +26,11 @@ Nothing is blocked; what remains is polish.
       `ms.vss-build-web.build-results-tab` named "Argo CD", mirroring `azdo-tf-plan-viewer`:
       webpack bundle (esbuild **cannot** be used -- `azure-devops-extension-api` is AMD-only),
       `tl.addAttachment` on the task side, `BuildRestClient` on the tab side. Scaffolded,
-      packaging verified, 516 tests green. Remaining: publish attachments from `AppSet`,
-      `Project` and `Account`; have `diff`/`history` contribute structured data via
-      `OperationOutcome.attachment`; local dev-fixture harness; docs.
+      packaging verified, 528 tests green. `diff`, `history`, `status` and `wait` now populate
+      `OperationOutcome.attachment`, so the tab's diff, history and unhealthy sections are
+      real rather than fixture-only. Remaining: publish attachments from `AppSet`, `Project`
+      and `Account` (their GUIDs are deliberately **not** in `supportsTasks` until they do,
+      or the tab appears saying "No Argo CD results"); docs.
       **Release note:** adding `scopes: ["vso.build"]` means every existing install needs
       re-authorisation by an org admin, so this is a minor bump, not a patch.
 - [ ] **Capture screenshots** into `marketplace/images/` and declare them in

@@ -2,7 +2,7 @@
 
 import * as tl from 'azure-pipelines-task-lib/task';
 import { ResourceDiff } from '@azdo-argocd/argocd-client';
-import { Decision, aggregate, decideFromDiff, renderDiffSummary } from '@azdo-argocd/task-common';
+import { AttachmentDiff, Decision, aggregate, decideFromDiff, renderDiffSummary, toAttachmentDiffs } from '@azdo-argocd/task-common';
 import { OperationContext, OperationOutcome, fetchSnapshots, resolveApplications } from './context';
 
 export async function runDiff(ctx: OperationContext): Promise<OperationOutcome> {
@@ -11,6 +11,7 @@ export async function runDiff(ctx: OperationContext): Promise<OperationOutcome> 
 
     const decisions: Decision[] = [];
     const summaries: string[] = [];
+    const diffs: AttachmentDiff[] = [];
     let totalChanged = 0;
 
     for (const ref of refs) {
@@ -23,6 +24,7 @@ export async function runDiff(ctx: OperationContext): Promise<OperationOutcome> 
         totalChanged += changed;
 
         decisions.push(decideFromDiff(changed, failOnDiff));
+        diffs.push(...toAttachmentDiffs(resources));
         summaries.push(
             renderDiffSummary({
                 applicationName: ref.name,
@@ -43,5 +45,6 @@ export async function runDiff(ctx: OperationContext): Promise<OperationOutcome> 
             hasDiff: String(totalChanged > 0),
             diffResourceCount: String(totalChanged),
         },
+        attachment: { diffs },
     };
 }

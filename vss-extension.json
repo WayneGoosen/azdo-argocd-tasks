@@ -233,10 +233,7 @@
                 "name": "Argo CD",
                 "uri": "dist/tab/tab.html",
                 "supportsTasks": [
-                    "432dec46-815a-45c9-85b7-cbd13782f6df",
-                    "4df35b0e-0838-41e2-904b-ddf54b4c888e",
-                    "dfacc01f-c5b9-4296-9997-4066b96cb1fc",
-                    "f7f79a13-e122-42d3-b9df-29308cee7c47"
+                    "432dec46-815a-45c9-85b7-cbd13782f6df"
                 ]
             }
         },
