@@ -3,4 +3,5 @@ export * from './errors';
 export * from './logs';
 export * from './retry';
 export * from './transport';
+export * from './text';
 export * from './types';

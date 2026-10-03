@@ -1,3 +1,4 @@
+import { trimSlashes } from '@azdo-argocd/argocd-client';
 // Building the environment and argv for an `argocd` invocation.
 //
 // The security-relevant decision lives here: the token goes into the child process
@@ -35,10 +36,9 @@ export interface CliEnvironmentOptions {
  * "example.com/argocd" for a sub-path install.
  */
 export function serverAddress(serverUrl: string): string {
-    return serverUrl
-        .trim()
-        .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
-        .replace(/\/+$/, '');
+    // The scheme regex is anchored at the start and linear; only the trailing-slash strip
+    // was the polynomial one.
+    return trimSlashes(serverUrl.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, ''));
 }
 
 export function isPlaintext(serverUrl: string): boolean {

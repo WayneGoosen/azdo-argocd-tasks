@@ -129,6 +129,13 @@ Non-obvious facts that cost real time to find. All verified against the Argo CD 
   `ArgoCDApp1`, `ArgoCDApp2`, … so output variables exist as `ARGOCDAPP1_HEALTHSTATUS` and
   `$(argocd.healthStatus)` resolves to nothing with no warning. `env | grep -i argocd` in the next
   step is the fastest diagnosis.
+- **`str.replace(/\/+$/, '')` is polynomial.** `/+` is greedy with no possessive form in
+  JavaScript, so when the `$` anchor fails the engine retries the run from every later
+  position: O(n^2). Measured 168ms / 659ms / 2,618ms for 20k / 40k / 80k slashes. It appeared
+  in six places and CodeQL flagged every one. Use `trimSlashes()` from
+  `@azdo-argocd/argocd-client`, which is two loops and linear. Inputs here are
+  pipeline-author controlled rather than attacker controlled, so this was a self-inflicted
+  hang at worst -- but it is free to avoid and reads better.
 - **`azure-devops-extension-api` ships only AMD modules.** esbuild cannot consume AMD at all,
   which is why the tab alone is bundled by webpack while every task uses esbuild. Not a
   preference -- see the comment at the top of `webpack.config.js`.

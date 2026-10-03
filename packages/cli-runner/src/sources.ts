@@ -1,3 +1,4 @@
+import { trimSlashes } from '@azdo-argocd/argocd-client';
 // Where to fetch the argocd CLI from.
 //
 // Two sources, and they are NOT interchangeable.
@@ -29,7 +30,7 @@ export const CHECKSUMS_ASSET = 'cli_checksums.txt';
  */
 export function releaseBaseUrl(override?: string  ): string {
     const trimmed = (override ?? '').trim();
-    return trimmed === '' ? GITHUB_REPO : trimmed.replace(/\/+$/, '');
+    return trimmed === '' ? GITHUB_REPO : trimSlashes(trimmed);
 }
 
 export function githubAssetUrl(tag: string, assetName: string, baseUrl?: string  ): string {
@@ -45,7 +46,7 @@ export function githubChecksumsUrl(tag: string, baseUrl?: string  ): string {
  * Built by joining onto the connection URL's path so `--rootpath` installs work.
  */
 export function serverDownloadUrl(serverUrl: string, goArch: string): string {
-    const base = serverUrl.trim().replace(/\/+$/, '');
+    const base = trimSlashes(serverUrl.trim());
     return `${base}/download/argocd-linux-${goArch}`;
 }
 
