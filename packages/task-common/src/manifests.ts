@@ -32,7 +32,7 @@ export function parseKubernetesManifests(
         const kind = manifest['kind'];
         if (kind !== expectedKind) {
             throw new Error(
-                `Document ${index + 1} of "${fileName}" has kind "${String(kind ?? 'none')}", not ` +
+                `Document ${index + 1} of "${fileName}" has kind "${describeValue(kind)}", not ` +
                     `"${expectedKind}". This command creates ${expectedKind} resources only.`,
             );
         }
@@ -45,7 +45,36 @@ export function parseKubernetesManifests(
     return manifests;
 }
 
+/**
+ * Render a parsed-YAML value for an error message.
+ *
+ * Values here come from user YAML and are `unknown`: `kind: {a: b}` is malformed but
+ * perfectly parseable. Plain String() would report it as "[object Object]" -- the least
+ * helpful possible message at exactly the moment someone needs to find their typo.
+ */
+function describeValue(value: unknown): string {
+    if (value === undefined || value === null) {
+        return 'none';
+    }
+    switch (typeof value) {
+        case 'string':
+            return value;
+        case 'number':
+        case 'boolean':
+        case 'bigint':
+            return String(value);
+        case 'symbol':
+            // String(symbol) is legal but `${symbol}` throws; be explicit either way.
+            return value.toString();
+        default:
+            // Objects, arrays and functions. JSON.stringify returns undefined for a
+            // function or a bare symbol, hence the fallback.
+            return JSON.stringify(value) ?? Object.prototype.toString.call(value);
+    }
+}
+
 /** Name of a manifest, for logging. */
 export function manifestName(manifest: Record<string, unknown>): string {
-    return String((manifest['metadata'] as Record<string, unknown> | undefined)?.['name'] ?? '');
+    const name = (manifest['metadata'] as Record<string, unknown> | undefined)?.['name'];
+    return name === undefined ? '' : describeValue(name);
 }

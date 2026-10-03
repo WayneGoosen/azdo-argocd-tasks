@@ -4,7 +4,7 @@ domain: waynegoosen
 status: In development
 priority: P2
 stage: pre-release
-updated: 2026-09-27
+updated: 2026-09-30
 repo: https://github.com/WayneGoosen/azdo-argocd-tasks.git
 ---
 
@@ -17,26 +17,33 @@ things that will bite you. Written so it can be picked up cold.
 
 ## 🎯 Now — active focus
 
-**Published.** `WayneGoosen.argocd-pipeline-tasks` **v1.0.5** is live, validated and public since
-2026-09-27 21:25 UTC. Verified from the published VSIX: endpoint type `argocdrest` throughout,
-six task contributions.
+**Shipped and green.** `WayneGoosen.argocd-pipeline-tasks` **v1.0.6** is live since 2026-09-28
+21:44 UTC. Verified from the published VSIX: the multi-source `revision` fix is in, the
+`revisions` output is declared, endpoint type `argocdrest`. The integration matrix is green.
+Nothing is blocked; what remains is polish.
 
-- [ ] **Ship 1.0.6 with the multi-source `revision` fix.** 1.0.5 has the bug — confirmed by
-      grepping the published bundle, `revisions` appears nowhere in it. Every multi-source
-      application on the live extension publishes an empty `revision`.
+- [ ] **Finish and ship the Argo CD tab** (in progress, uncommitted). A real
+      `ms.vss-build-web.build-results-tab` named "Argo CD", mirroring `azdo-tf-plan-viewer`:
+      webpack bundle (esbuild **cannot** be used -- `azure-devops-extension-api` is AMD-only),
+      `tl.addAttachment` on the task side, `BuildRestClient` on the tab side. Scaffolded,
+      packaging verified, 516 tests green. Remaining: publish attachments from `AppSet`,
+      `Project` and `Account`; have `diff`/`history` contribute structured data via
+      `OperationOutcome.attachment`; local dev-fixture harness; docs.
+      **Release note:** adding `scopes: ["vso.build"]` means every existing install needs
+      re-authorisation by an org admin, so this is a minor bump, not a patch.
 - [ ] **Capture screenshots** into `marketplace/images/` and declare them in
-      `vss-extension.json`. The published 1.0.5 has **no** `Screenshots.N` asset, so the listing
-      renders imageless. `.github/RELEASING.md` has the shot list and the JSON snippet.
-- [ ] **Recreate the Argo CD service connection** in the test org. Anything created before the
-      rename is bound to the old type and will not appear in the picker.
+      `vss-extension.json`. The published 1.0.6 still has **no** `Screenshots.N` asset, so the
+      listing renders imageless. This is now the single biggest gap for anyone landing on it
+      cold. `.github/RELEASING.md` has the shot list and the JSON snippet.
+- [ ] **Recreate the Argo CD service connection** in the test org, and confirm `revision` is
+      populated on the real multi-source app that surfaced the bug. The fix is verified by
+      tests and by inspecting the published bundle, never against that actual application.
 
 ## ⏭️ Next — committed pipeline
 
-- [ ] **Subsequent publishes can use `marketplace-publish.yml`** now the extension record exists.
-      Tag, then run it with that tag.
-- [ ] **Re-run the integration matrix.** The last CI run surfaced three real harness bugs
-      (`$HOME` unset, Redis not ready, the guestbook fixture never synced). All fixed; the
-      green run that proves it has not happened yet.
+- [ ] **Make the run summary tab first-class** — see the backlog entry. It is the most valuable
+      undiscovered feature in the extension.
+- [ ] **Decide on `internal/prd.md`.** Still gitignored and single-machine.
 
 ## 💡 Later — backlog
 
@@ -78,10 +85,12 @@ six task contributions.
 
 | | |
 |---|---|
-| **Verified publisher** | Required by Microsoft before an extension can be listed publicly. Needs your account. The only hard blocker. |
-| **No screenshots** | The listing will render without images until `marketplace/images/` has some. Shot list in `.github/RELEASING.md`. |
-| **Integration matrix unproven** | Fixes for the three bugs the first run found are in, but no green run yet. |
+| **No screenshots** | The listing renders without images until `marketplace/images/` has some. Shot list in `.github/RELEASING.md`. The only user-visible gap. |
+| **Fix unconfirmed in the wild** | The multi-source `revision` fix is proven by tests and by inspecting the published bundle, but never run against the real chart-plus-values app that surfaced it. |
 | **`internal/prd.md` is gitignored** | The original architecture research exists only on this machine. Move it somewhere tracked if it should survive. |
+
+Publisher verification turned out **not** to be a blocker: the extension listed publicly and
+came back `validated, public` without it. The earlier note claiming otherwise was wrong.
 
 ### Dated commitments
 
@@ -118,6 +127,27 @@ Non-obvious facts that cost real time to find. All verified against the Argo CD 
   `ArgoCDApp1`, `ArgoCDApp2`, … so output variables exist as `ARGOCDAPP1_HEALTHSTATUS` and
   `$(argocd.healthStatus)` resolves to nothing with no warning. `env | grep -i argocd` in the next
   step is the fastest diagnosis.
+- **`azure-devops-extension-api` ships only AMD modules.** esbuild cannot consume AMD at all,
+  which is why the tab alone is bundled by webpack while every task uses esbuild. Not a
+  preference -- see the comment at the top of `webpack.config.js`.
+- **Two SDK copies hang the tab with no error.** The api package's AMD modules resolve
+  `azure-devops-extension-sdk` through the package `exports` map, which can land on a
+  different file than our ESM import. Two instances means the second trips the SDK's
+  "already loaded" guard and `SDK.init()` never resolves -- the tab sits on its loading state
+  forever with nothing logged. The `azure-devops-extension-sdk$` webpack alias prevents it.
+- **`tslib` is a real runtime dependency of the SDK's AMD output**, not vestigial. Without it
+  the tab bundle fails to resolve at build time.
+- **`dist/tab` must be `addressable: true`** or the files ship inside the VSIX with no URL and
+  the iframe 404s to a blank tab.
+- **`supportsTasks` GUIDs are hand-copied from each `task.json`.** Drift silently stops the tab
+  appearing, with no error anywhere. Guarded by `test/manifest/extension-manifest.test.ts`.
+- **timelineId and recordId exist only inside the attachment href.** `getAttachments()` returns
+  a name and `_links`; `getAttachment()` demands both ids. They have to be regexed out, and
+  both the `dev.azure.com` and `*.visualstudio.com` URL shapes must parse.
+- **`tl.setSecret` does not protect files we write.** It masks the agent's log stream only. The
+  run attachment is `fs.writeFileSync` plus an upload, so secrets are caught by
+  `registerSecret`/`secretLeakIn` at the `publishRunAttachment` choke point, which refuses to
+  publish rather than scrubbing -- a hit means a bug, and scrubbing would hide it.
 - **Service endpoint type names are a Marketplace-GLOBAL namespace.** Not per-publisher, not
   per-extension. The first extension to publish a given name holds it, and every later
   extension declaring it is rejected at validation:
@@ -218,11 +248,14 @@ auth. A half-tested credential-rotation task is worse than the documented step i
 
 ## Health
 
-- **Last commit:** 2026-09-27 `b89965c` — releases tagged through `v1.0.3`
+- **Last commit:** 2026-09-28 `ab2c560` — releases tagged through `v1.0.6`; working tree clean,
+  nothing unpushed
 - **Visibility:** repo public; Pages live at <https://waynegoosen.github.io/azdo-argocd-tasks/>
   (redirects to the account's `waynegoosen.com` custom domain)
-- **Marketplace:** **v1.0.5 live** (validated, public, 2 installs). 1.0.4 was rejected for the
-  endpoint-name collision; 1.0.0-1.0.4 are spent and can never be reused
-- **Tests:** 477 passing, 28 integration skipped (no live server)
+- **Marketplace:** **v1.0.6 live** (validated, public, 2 installs). 1.0.4 was rejected for the
+  endpoint-name collision; 1.0.0-1.0.6 are spent and can never be reused
+- **Tests:** 516 passing, 28 integration skipped (no live server). Deterministic from a clean
+  tree — verified by repeated `rm -rf dist && npm test`
 - **Build:** 6 task bundles, each self-contained, 576 KiB VSIX
+- **CI:** Main, Docs and **Integration** all green on `ab2c560` / `3e7e2f1`
 - **Docs:** `mkdocs build --strict` clean

@@ -27,16 +27,16 @@ export const CHECKSUMS_ASSET = 'cli_checksums.txt';
  * them every run. A mirror must lay assets out the same way GitHub does:
  * `<base>/releases/download/<tag>/<asset>`.
  */
-export function releaseBaseUrl(override?: string | undefined): string {
+export function releaseBaseUrl(override?: string  ): string {
     const trimmed = (override ?? '').trim();
     return trimmed === '' ? GITHUB_REPO : trimmed.replace(/\/+$/, '');
 }
 
-export function githubAssetUrl(tag: string, assetName: string, baseUrl?: string | undefined): string {
+export function githubAssetUrl(tag: string, assetName: string, baseUrl?: string  ): string {
     return `${releaseBaseUrl(baseUrl)}/releases/download/${tag}/${assetName}`;
 }
 
-export function githubChecksumsUrl(tag: string, baseUrl?: string | undefined): string {
+export function githubChecksumsUrl(tag: string, baseUrl?: string  ): string {
     return githubAssetUrl(tag, CHECKSUMS_ASSET, baseUrl);
 }
 

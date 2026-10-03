@@ -1,0 +1,49 @@
+# Dependency updates.
+#
+# Grouped deliberately: ungrouped npm updates on a repo this size produce a PR per package
+# per week, and every one of them has to clear the `build` check. Grouped means a handful of
+# reviewable PRs instead of a stream of noise.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # The tab toolchain moves together and is exercised by one build step.
+      tab-toolchain:
+        patterns:
+          - webpack
+          - webpack-cli
+          - ts-loader
+          - azure-devops-extension-*
+      # Lint and test tooling: a major here can change rule behaviour, so keep them visible
+      # as a group rather than folded into everything else.
+      dev-tooling:
+        patterns:
+          - eslint
+          - '@eslint/*'
+          - typescript-eslint
+          - vitest
+          - '@vitest/*'
+          - typescript
+      production:
+        dependency-type: production
+    ignore:
+      # Pinned on purpose: the Node20_1 handler is the lower bound both bundles target, so
+      # @types/node must not run ahead of the oldest agent runtime.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ['*']

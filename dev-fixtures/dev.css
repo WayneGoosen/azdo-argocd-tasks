@@ -1,0 +1,32 @@
+/* Chrome for the local preview only. Never shipped — dev-fixtures/ is not in files[]. */
+.dev-bar {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 8px 20px;
+    font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+    background: #2d2d30;
+    color: #ddd;
+    border-bottom: 1px solid #3f3f46;
+}
+.dev-bar span { opacity: 0.7; }
+.dev-bar label { margin-left: auto; cursor: pointer; }
+
+/* Approximate ADO's dark theme tokens so the preview exercises the same code path the host
+   does -- the tab itself has no dark styling of its own, by design. */
+/* Must be on :root, not body. The tab's --ac-* variables are declared on :root, so they
+   resolve --text-primary-color as seen THERE -- a value set on body is a descendant and is
+   never consulted. Azure DevOps writes its tokens onto the document element for the same
+   reason. */
+:root[data-dev-dark] {
+    --text-primary-color: #e6e6e6;
+    --text-secondary-color: #a6a6a6;
+    --background-color: #1f1f1f;
+    --callout-background-color: #2a2a2a;
+    --palette-neutral-8: #3f3f46;
+    --palette-neutral-4: #333338;
+    --communication-foreground: #4ea1f3;
+    --status-success-foreground: #4ec94e;
+    --status-warning-foreground: #e6b422;
+    --status-error-foreground: #f1707b;
+}

@@ -35,3 +35,5 @@ docs/assets/images/
 # Marketing-ready screenshots belong in marketplace/images/ and are tracked.
 /*.png
 /Screenshot*
+.dev/
+coverage/

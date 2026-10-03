@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
-import { ensureBuilt, outputVariable, runTask, summaryPathFrom } from '../support/run-task';
+import { attachmentFrom, ensureBuilt, outputVariable, runTask, summaryPathFrom } from '../support/run-task';
 
 const TOKEN = 'super-secret-argocd-token';
 
@@ -343,6 +343,51 @@ describe('bundled ArgoCDApp task', () => {
         });
 
         expect(stdout).toContain('##vso[task.complete result=Failed');
+    });
+
+    it('publishes a run attachment for the Argo CD tab', async () => {
+        resetScenario({ applications: [application({})] });
+
+        const { stdout } = await runAppTask({
+            command: 'get',
+            applications: 'payments',
+            project: 'payments',
+            publishSummary: 'false',
+        });
+
+        // publishSummary gates the tab attachment too -- it is the same opt-out.
+        expect(attachmentFrom(stdout), 'attachment published despite publishSummary=false').toBeUndefined();
+
+        const second = await runAppTask({
+            command: 'get',
+            applications: 'payments',
+            project: 'payments',
+            publishSummary: 'true',
+        });
+
+        const run = attachmentFrom(second.stdout) as
+            | { schema: number; task: string; command: string; applications: Array<Record<string, unknown>> }
+            | undefined;
+        expect(run, 'no run attachment was published').toBeDefined();
+        expect(run?.schema, 'the tab switches on this').toBe(1);
+        expect(run?.task).toBe('ArgoCDApp@1');
+        expect(run?.command).toBe('get');
+        expect(run?.applications?.[0]).toMatchObject({ name: 'payments', syncStatus: 'Synced', healthStatus: 'Healthy' });
+    });
+
+    it('never puts the connection token in the attachment', async () => {
+        // The attachment is a file we write and publish; the agent masks its log stream, not
+        // this. The endpoint token is registered as a secret, so the guard must catch it.
+        resetScenario({ applications: [application({})] });
+        const { stdout } = await runAppTask({
+            command: 'get',
+            applications: 'payments',
+            project: 'payments',
+            publishSummary: 'true',
+        });
+        const raw = JSON.stringify(attachmentFrom(stdout) ?? {});
+        expect(raw).not.toContain(TOKEN);
+        expect(raw.length, 'attachment was empty, so the assertion above proved nothing').toBeGreaterThan(50);
     });
 
     it('fails with a readable message when no application is specified', async () => {

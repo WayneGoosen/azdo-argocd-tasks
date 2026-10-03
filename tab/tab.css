@@ -1,0 +1,268 @@
+/* Styling for the "Argo CD" build-results tab.
+ *
+ * THEMING: SDK.init({ applyTheme: true }) makes the host write its theme onto this iframe's
+ * document as CSS custom properties. Every colour below derives from one of those tokens, so
+ * light, dark and high-contrast all work from a single token set -- there are deliberately no
+ * media queries and no [data-theme] selectors. Hex values are fallbacks for when the tab is
+ * opened outside Azure DevOps (the local dev harness).
+ */
+
+:root {
+    /* Opt out of Chrome's "Auto Dark Mode for Web Contents", which force-inverts pages that
+     * do not declare a scheme. Without this the host's theme tokens are applied and THEN
+     * inverted on top, so a light Azure DevOps renders as a dark tab for anyone with the
+     * feature on -- and nothing in the page can detect it. Declaring both schemes tells the
+     * browser this page themes itself. */
+    color-scheme: light dark;
+
+    --ac-text: var(--text-primary-color, #1f1f1f);
+    --ac-text-muted: var(--text-secondary-color, #6c6c6c);
+    --ac-bg: var(--background-color, #ffffff);
+    --ac-bg-elev: var(--callout-background-color, #f6f6f6);
+    --ac-border: var(--palette-neutral-8, #e1e1e1);
+    --ac-border-soft: var(--palette-neutral-4, #ededed);
+    --ac-accent: var(--communication-foreground, #0078d4);
+
+    --ac-ok: var(--status-success-foreground, #107c10);
+    --ac-warn: var(--status-warning-foreground, #c19c00);
+    --ac-bad: var(--status-error-foreground, #d13438);
+    --ac-busy: var(--communication-foreground, #0078d4);
+    --ac-idle: var(--text-secondary-color, #6c6c6c);
+    /* ADO has no purple status token; Suspended needs to read as neither good nor bad. */
+    --ac-suspended: #8764b8;
+
+    /* Match azure-devops-ui's font stacks so the tab feels native.
+     * Cascadia MONO, not Code: Code enables programming ligatures, which would render a
+     * literal `!=` in a manifest diff as a single glyph and misrepresent the content. */
+    --ac-font: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Helvetica, Ubuntu, Arial, sans-serif;
+    --ac-font-mono: "Cascadia Mono", Menlo, Consolas, "Courier New", monospace;
+}
+
+body {
+    margin: 0;
+    background: var(--ac-bg);
+    color: var(--ac-text);
+    font-family: var(--ac-font);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+#container {
+    padding: 16px 20px 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ---- status / empty states ---- */
+.status {
+    padding: 48px 16px;
+    text-align: center;
+    color: var(--ac-text-muted);
+}
+.status-title {
+    font-size: 16px;
+    color: var(--ac-text);
+    margin-bottom: 4px;
+}
+.status-error .status-title {
+    color: var(--ac-bad);
+}
+
+/* ---- step selector ----
+ * Present in the DOM whether or not it has content, so the body does not jump when a build
+ * has a single Argo CD step. Empty means hidden, not absent. */
+.step-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.step-bar:empty {
+    display: none;
+}
+.step-bar label {
+    color: var(--ac-text-muted);
+}
+.step-bar select {
+    font-family: inherit;
+    font-size: 14px;
+    padding: 4px 8px;
+    color: var(--ac-text);
+    background: var(--ac-bg);
+    border: 1px solid var(--ac-border);
+    border-radius: 2px;
+}
+
+/* ---- heading ---- */
+.run-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 12px;
+    margin-bottom: 16px;
+}
+.run-title {
+    font-size: 18px;
+    font-weight: 600;
+}
+.run-meta {
+    color: var(--ac-text-muted);
+    font-size: 13px;
+}
+
+/* ---- summary cards ---- */
+.cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.card {
+    flex: 1 1 150px;
+    min-width: 150px;
+    padding: 12px 14px;
+    border: 1px solid var(--ac-border);
+    border-radius: 3px;
+    /* Solid 8px accent edge fading into a wash, so the number sits on a tint of its own
+     * status colour rather than against a hard rule. */
+    background-color: var(--ac-bg);
+    background-image: linear-gradient(
+        to right,
+        var(--card-accent, var(--ac-idle)) 0,
+        var(--card-accent, var(--ac-idle)) 6px,
+        color-mix(in srgb, var(--card-accent, var(--ac-idle)) 20%, transparent) 6px,
+        transparent 110px
+    );
+    background-repeat: no-repeat;
+}
+.card-count {
+    font-size: 24px;
+    font-weight: 600;
+}
+.card-label {
+    color: var(--ac-text-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.card-ok { --card-accent: var(--ac-ok); }
+.card-warn { --card-accent: var(--ac-warn); }
+.card-bad { --card-accent: var(--ac-bad); }
+.card-busy { --card-accent: var(--ac-busy); }
+
+/* ---- sections ---- */
+.section {
+    margin-top: 24px;
+}
+.section-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--ac-border-soft);
+}
+
+/* ---- tables ---- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ac-text-muted);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--ac-border);
+    white-space: nowrap;
+}
+td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--ac-border-soft);
+    vertical-align: top;
+}
+tr:hover td {
+    background: var(--ac-bg-elev);
+}
+a {
+    color: var(--ac-accent);
+}
+code,
+.mono {
+    font-family: var(--ac-font-mono);
+    font-size: 12.5px;
+}
+
+/* ---- status pills ---- */
+.pill {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    white-space: nowrap;
+    border: 1px solid color-mix(in srgb, var(--pill-color, var(--ac-idle)) 45%, transparent);
+    background: color-mix(in srgb, var(--pill-color, var(--ac-idle)) 12%, transparent);
+    color: var(--pill-color, var(--ac-idle));
+}
+.pill-ok { --pill-color: var(--ac-ok); }
+.pill-warn { --pill-color: var(--ac-warn); }
+.pill-bad { --pill-color: var(--ac-bad); }
+.pill-busy { --pill-color: var(--ac-busy); }
+.pill-suspended { --pill-color: var(--ac-suspended); }
+.pill-idle { --pill-color: var(--ac-idle); }
+
+.muted {
+    color: var(--ac-text-muted);
+}
+
+/* ---- diffs ---- */
+details.diff {
+    border: 1px solid var(--ac-border);
+    border-radius: 3px;
+    margin-bottom: 8px;
+    background: var(--ac-bg);
+}
+details.diff > summary {
+    cursor: pointer;
+    padding: 8px 12px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-family: var(--ac-font-mono);
+    font-size: 12.5px;
+}
+.diff-counts {
+    margin-left: auto;
+    font-family: var(--ac-font-mono);
+    font-size: 12px;
+}
+.diff-counts .add { color: var(--ac-ok); }
+.diff-counts .del { color: var(--ac-bad); }
+pre.patch {
+    margin: 0;
+    padding: 10px 12px;
+    overflow-x: auto;
+    border-top: 1px solid var(--ac-border-soft);
+    font-family: var(--ac-font-mono);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+pre.patch .l-add { background: color-mix(in srgb, var(--ac-ok) 10%, transparent); display: block; }
+pre.patch .l-del { background: color-mix(in srgb, var(--ac-bad) 10%, transparent); display: block; }
+pre.patch .l-hunk { color: var(--ac-text-muted); display: block; }
+
+/* ---- notes ---- */
+.notes {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.failed-banner {
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    border: 1px solid color-mix(in srgb, var(--ac-bad) 45%, transparent);
+    background: color-mix(in srgb, var(--ac-bad) 8%, transparent);
+    border-radius: 3px;
+}

@@ -54,7 +54,7 @@ function queryParam(op: SwaggerOperation, name: string): SwaggerParameter | unde
 function definition(name: string): Record<string, unknown> {
     const def = spec.definitions[name];
     expect(def, `definition ${name} is missing from the spec`).toBeDefined();
-    return (def?.properties ?? {}) as Record<string, unknown>;
+    return (def?.properties ?? {});
 }
 
 describe('endpoints the extension calls', () => {

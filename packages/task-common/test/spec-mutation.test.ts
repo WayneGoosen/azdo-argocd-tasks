@@ -43,9 +43,9 @@ function richSpec(): OpaqueSpec {
 
 /** Everything except the source, which mutations legitimately change. */
 function untouchedParts(spec: OpaqueSpec): Record<string, unknown> {
-    const { source, sources, ...rest } = spec as Record<string, unknown>;
-    void source;
-    void sources;
+    // Destructured only to exclude them from `rest`; the underscore prefix is what marks
+    // them deliberately unused.
+    const { source: _source, sources: _sources, ...rest } = spec as Record<string, unknown>;
     return rest;
 }
 

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Argo CD</title>
+    <link rel="stylesheet" href="tab.css">
+</head>
+<body>
+    <!-- This static state is visible from iframe load until tab.js runs, so there is no
+         flash of empty page before the first render. tab.js replaces it. -->
+    <div id="container">
+        <div class="status status-loading">
+            <div class="status-title">Loading Argo CD results…</div>
+        </div>
+    </div>
+    <script src="tab.js"></script>
+</body>
+</html>

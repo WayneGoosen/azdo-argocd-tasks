@@ -1,0 +1,18 @@
+{
+    "schema": 1,
+    "task": "ArgoCDAppSet@1",
+    "command": "generate",
+    "step": "Preview tenants",
+    "serverUrl": "https://argocd.example.com",
+    "finishedAt": "2026-10-02T09:16:10.000Z",
+    "result": "Succeeded",
+    "generatedApps": [
+        { "name": "tenant-acme", "project": "tenants", "namespace": "acme", "server": "https://kubernetes.default.svc" },
+        { "name": "tenant-globex", "project": "tenants", "namespace": "globex", "server": "https://kubernetes.default.svc" },
+        { "name": "tenant-initech", "project": "tenants", "namespace": "initech", "server": "https://eu-west.example.com" }
+    ],
+    "notes": [
+        "Generated from the list generator in tenants-appset.yaml.",
+        "preserveResourcesOnDeletion is not set: deleting this ApplicationSet would remove all three applications."
+    ]
+}

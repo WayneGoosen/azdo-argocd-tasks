@@ -48,7 +48,7 @@ function ensureRecord(parent: Record<string, unknown>, key: string): Record<stri
  * entry -- and positions are 1-BASED. Getting that wrong would edit the wrong source of a
  * multi-source app, so a position is required rather than guessed.
  */
-export function selectSource(spec: OpaqueSpec, position?: number | undefined): OpaqueSource {
+export function selectSource(spec: OpaqueSpec, position?: number  ): OpaqueSource {
     const sources = asArray(spec['sources']);
 
     if (sources !== undefined && sources.length > 0) {
@@ -235,7 +235,7 @@ function isEmptyBlock(value: unknown): boolean {
             entry === '' ||
             entry === false ||
             (Array.isArray(entry) && entry.length === 0) ||
-            (asRecord(entry) !== undefined && Object.keys(entry as object).length === 0),
+            (asRecord(entry) !== undefined && Object.keys(entry).length === 0),
     );
 }
 

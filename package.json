@@ -18,9 +18,18 @@
     "scripts": {
         "clean": "rimraf dist *.vsix",
         "typecheck": "tsc --noEmit",
-        "build": "npm run clean && npm run typecheck && node scripts/build.mjs",
+        "typecheck:tab": "tsc --noEmit -p tsconfig.tab.json",
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix",
+        "build:tasks": "node scripts/build.mjs",
+        "build:tab": "webpack --mode production",
+        "copy:tab": "copyfiles -f tab/*.html tab/*.css dist/tab/",
+        "dev:tab": "npm run build:tab && npm run copy:tab && rimraf .dev && copyfiles -u 2 \"dist/tab/**/*\" .dev/ && copyfiles -u 1 \"dev-fixtures/**/*\" .dev/",
+        "dev": "npm run dev:tab && npx --yes http-server .dev -c-1 -p 8777",
+        "build": "npm run clean && npm run typecheck && npm run typecheck:tab && npm run build:tasks && npm run build:tab && npm run copy:tab",
         "build:dev": "node scripts/build.mjs --sourcemap",
         "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
         "test:watch": "vitest",
         "package": "npm run build && tfx extension create --manifest-globs vss-extension.json --output-path dist/",
         "package:dev": "npm run build && tfx extension create --manifest-globs vss-extension.json --overrides-file vss-extension.dev.json --output-path dist/",
@@ -28,12 +37,24 @@
         "swagger:fetch": "node scripts/fetch-swagger.mjs"
     },
     "devDependencies": {
+        "@eslint/js": "^9.39.5",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^20.19.9",
+        "@vitest/coverage-v8": "^3.2.7",
+        "azure-devops-extension-api": "^4.270.0",
+        "azure-devops-extension-sdk": "^4.2.0",
+        "copyfiles": "^2.4.1",
         "esbuild": "^0.25.0",
+        "eslint": "^9.39.5",
+        "globals": "^15.15.0",
         "rimraf": "^6.0.1",
         "tfx-cli": "^0.24.2",
+        "ts-loader": "^9.6.2",
+        "tslib": "^2.8.1",
         "typescript": "^5.7.3",
-        "vitest": "^3.0.5"
+        "typescript-eslint": "^8.71.0",
+        "vitest": "^3.0.5",
+        "webpack": "^5.111.1",
+        "webpack-cli": "^6.0.1"
     }
 }
