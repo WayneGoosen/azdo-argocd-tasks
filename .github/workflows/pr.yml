@@ -21,18 +21,18 @@ jobs:
       # so a step-level SONAR_TOKEN would always read as empty in the condition below.
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0 # GitVersion counts from repo init without full history
 
-      - uses: gittools/actions/gitversion/setup@v4.0.1
+      - uses: gittools/actions/gitversion/setup@1918cb0db30e20631f273e322d08c48af11db368 # v4.0.1
         with:
           versionSpec: '6.x'
 
       - id: gitversion
-        uses: gittools/actions/gitversion/execute@v4.0.1
+        uses: gittools/actions/gitversion/execute@1918cb0db30e20631f273e322d08c48af11db368 # v4.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: npm
@@ -128,16 +128,16 @@ jobs:
         # Skipped when SONAR_TOKEN is absent -- on forks, and before the SonarCloud project
         # is set up. `build` is a required check, so this must never be the reason it fails.
         if: ${{ env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarqube-scan-action@v8.3.0
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: vsix
           path: dist/*.vsix
           retention-days: 14
 
       - name: Comment the calculated version
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const version = '${{ steps.gitversion.outputs.majorMinorPatch }}';

@@ -104,6 +104,26 @@ files serve both the listing and the docs. `docs/assets/images/` is generated, n
 `pr.yml` runs lint, both typechecks, tests with coverage, packaging, and asserts the VSIX
 actually contains what the listing and the tab need. `main` requires the `build` check.
 
+**Every action is pinned to a full commit SHA**, with the version in a trailing comment:
+
+```yaml
+- uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+```
+
+A tag is mutable. `@v4` and even `@v4.4.0` can be repointed at different code by whoever owns
+the repository, which on a workflow holding `ADO_PUBLISHER_PAT` means someone else choosing what
+runs with your publishing credentials. A SHA cannot be repointed. Do not "tidy" these back to
+tags; Dependabot updates SHA pins and rewrites the version comment for you.
+
+To re-pin after changing a version:
+
+```sh
+gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq '.object.sha'
+```
+
+If `.object.type` is `tag` rather than `commit` it is an annotated tag — dereference it with
+`gh api repos/<owner>/<repo>/git/tags/<sha> --jq '.object.sha'` to get the commit.
+
 **SonarCloud is configured but not yet connected.** `sonar-project.properties` assumes
 `organization=waynegoosen` and `projectKey=WayneGoosen_azdo-argocd-tasks`. To turn it on:
 
