@@ -20,10 +20,10 @@ updates:
           - webpack-cli
           - ts-loader
           - azure-devops-extension-*
-      # Lint, test and build tooling. These must move TOGETHER: vitest 5 pulls vite 8,
-      # which needs a newer esbuild and @types/node than we previously pinned, so splitting
-      # them produces PRs that cannot resolve individually. Learned the hard way -- PRs #4
-      # and #6 both failed `npm ci` until combined.
+      # Lint, test and build tooling. Grouped because the constraint between them is
+      # DIRECTIONAL: vitest/vite need a newer esbuild and @types/node, but esbuild updates
+      # fine on its own (PR #6 was green standalone; only PR #4 failed). Grouping means a
+      # vitest bump arrives with what it needs rather than as an unresolvable PR.
       dev-tooling:
         patterns:
           - eslint
@@ -41,22 +41,30 @@ updates:
       production:
         dependency-type: production
     ignore:
-      # TypeScript 7 is held back by our own linter, not by us: typescript-eslint caps its
-      # peer at `>=4.8.4 <6.1.0` and has published NO version supporting TS 7. Verified
-      # across its latest releases. Revisit when typescript-eslint ships TS 7 support.
+      # TypeScript 7 only. typescript-eslint caps its peer at `>=4.8.4 <6.1.0`, which DOES
+      # allow TypeScript 6 -- blocking all majors would silently hold back a compatible
+      # release. Revisit when typescript-eslint supports 7.
       - dependency-name: 'typescript'
-        update-types: ['version-update:semver-major']
+        versions: ['>=7']
       # azure-devops-extension-api@5 still declares `peer sdk@"^2 || ^3 || ^4"`, so SDK 5
       # cannot be installed alongside it. Upstream's inconsistency, not ours. api@5 +
       # sdk@4 resolves and builds cleanly -- verified.
       - dependency-name: 'azure-devops-extension-sdk'
         update-types: ['version-update:semver-major']
-      #
-      # NOTE: the former '@types/node' major hold was REMOVED. vitest 5 requires
-      # @types/node@26 and cannot resolve without it. The hold existed so types could not
-      # run ahead of the Node20_1 handler -- that guard is gone, so a task using a
-      # post-Node-20 API will now typecheck. The e2e suite runs the real bundles and is the
-      # remaining backstop.
+      # Vitest 5 declares `engines: node ^22.12 || ^24 || >=26`. CI runs Node 20, so this
+      # cannot merge -- and bumping CI is NOT a free fix: test/support/run-task.ts spawns
+      # the built task bundles with `process.execPath`, so CI's Node version is what
+      # validates the Node20_1 handler. Raising it would stop testing the oldest agent
+      # runtime we ship for. Revisit only when Node20_1 is dropped.
+      - dependency-name: 'vitest'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@vitest/*'
+        update-types: ['version-update:semver-major']
+      # Kept: the Node20_1 handler is the lower bound both bundles target, so @types/node
+      # must not describe APIs an agent will not have. (Vitest 5 would have forced this --
+      # its peer is `^22 || >=24` -- but Vitest 5 is held above anyway.)
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /

@@ -143,10 +143,17 @@ Non-obvious facts that cost real time to find. All verified against the Argo CD 
   `@azdo-argocd/argocd-client`, which is two loops and linear. Inputs here are
   pipeline-author controlled rather than attacker controlled, so this was a self-inflicted
   hang at worst -- but it is free to avoid and reads better.
-- **Dependabot groups must match peer-dependency reality, not tidy categories.** `vitest` 5
-  pulls `vite` 8, which needs a newer `esbuild` and `@types/node` than were pinned. Split
-  across separate PRs each one fails `npm ci` with ERESOLVE and neither can be merged alone.
-  Group anything that shares a peer constraint.
+- **Dependabot groups must match peer-dependency reality, not tidy categories** -- and the
+  constraint is usually DIRECTIONAL. `vitest` 5 pulls `vite` 8, which needs a newer
+  `esbuild` and `@types/node`; but `esbuild` updates perfectly well on its own (PR #6 was
+  green standalone, only PR #4 failed). Group what a bump *drags with it*, in that
+  direction.
+- **Check `engines`, not just peer ranges -- and check it on CI's Node, not yours.**
+  `vitest` 5 declares `node ^22.12 || ^24 || >=26`. It installed and ran fine locally on
+  Node 24 and would have failed on CI's Node 20. Raising CI's Node is not a free fix:
+  `test/support/run-task.ts` spawns the built bundles with `process.execPath`, so CI's Node
+  is what actually validates the `Node20_1` handler. Bumping it would quietly stop testing
+  the oldest agent runtime this extension supports.
 - **An `ERESOLVE` is usually "hold a version back", not "fix the code".** Two Dependabot PRs
   failed before a single line compiled: `azure-devops-extension-api@5` still declares
   `peer sdk@"^2 || ^3 || ^4"`, and `typescript-eslint` caps TypeScript at `<6.1.0` with no
