@@ -18,9 +18,17 @@ on:
       - 'scripts/**'
       - 'test/**'
       - '.github/workflows/integration.yml'
+      # Dependency updates too. A root devDependency bump touches ONLY these two files, so
+      # without them esbuild -- the bundler that produces all six shipped tasks -- could
+      # change without ever being run against a real Argo CD. Worse, it was inconsistent:
+      # a workspace dependency matched 'packages/**' and ran, a root one silently did not.
+      - 'package.json'
+      - 'package-lock.json'
   push:
     branches: [main]
     paths:
+      - 'package.json'
+      - 'package-lock.json'
       - 'packages/**'
       - 'tasks/**'
       # Watch this workflow and the harness it runs, so a fix to either actually

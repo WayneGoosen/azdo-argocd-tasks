@@ -143,6 +143,13 @@ Non-obvious facts that cost real time to find. All verified against the Argo CD 
   `@azdo-argocd/argocd-client`, which is two loops and linear. Inputs here are
   pipeline-author controlled rather than attacker controlled, so this was a self-inflicted
   hang at worst -- but it is free to avoid and reads better.
+- **Path filters silently excluded dependency updates from the integration matrix.**
+  `integration.yml` filtered on `packages/**`, `tasks/**`, `scripts/**`, `test/**` -- none of
+  which a root devDependency bump touches, since those PRs change only `package.json` and
+  `package-lock.json`. It was worse than simply off: a *workspace* dependency bump matched
+  `packages/**` and ran the matrix, a *root* one did not, so whether a bump was tested
+  against a real Argo CD was effectively arbitrary. `esbuild` -- the bundler producing all
+  six shipped tasks -- was in the untested half. Both manifests are now in the filter.
 - **Dependabot groups must match peer-dependency reality, not tidy categories** -- and the
   constraint is usually DIRECTIONAL. `vitest` 5 pulls `vite` 8, which needs a newer
   `esbuild` and `@types/node`; but `esbuild` updates perfectly well on its own (PR #6 was
