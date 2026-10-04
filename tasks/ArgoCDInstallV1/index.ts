@@ -228,7 +228,7 @@ async function download(args: {
         // tool-lib's downloader, rather than ours, so the agent's proxy configuration applies.
         downloaded = await toolLib.downloadToolWithRetries(url, args.cachedName);
     } catch (error) {
-        throw new Error(describeDownloadFailure(error, args.tag));
+        throw new Error(describeDownloadFailure(error, args.tag), { cause: error });
     }
 
     if (args.shouldVerify) {

@@ -20,8 +20,10 @@ updates:
           - webpack-cli
           - ts-loader
           - azure-devops-extension-*
-      # Lint and test tooling: a major here can change rule behaviour, so keep them visible
-      # as a group rather than folded into everything else.
+      # Lint, test and build tooling. These must move TOGETHER: vitest 5 pulls vite 8,
+      # which needs a newer esbuild and @types/node than we previously pinned, so splitting
+      # them produces PRs that cannot resolve individually. Learned the hard way -- PRs #4
+      # and #6 both failed `npm ci` until combined.
       dev-tooling:
         patterns:
           - eslint
@@ -30,13 +32,31 @@ updates:
           - vitest
           - '@vitest/*'
           - typescript
+          - esbuild
+          - '@types/node'
+          - globals
+          - rimraf
+          - copyfiles
+          - tslib
       production:
         dependency-type: production
     ignore:
-      # Pinned on purpose: the Node20_1 handler is the lower bound both bundles target, so
-      # @types/node must not run ahead of the oldest agent runtime.
-      - dependency-name: '@types/node'
+      # TypeScript 7 is held back by our own linter, not by us: typescript-eslint caps its
+      # peer at `>=4.8.4 <6.1.0` and has published NO version supporting TS 7. Verified
+      # across its latest releases. Revisit when typescript-eslint ships TS 7 support.
+      - dependency-name: 'typescript'
         update-types: ['version-update:semver-major']
+      # azure-devops-extension-api@5 still declares `peer sdk@"^2 || ^3 || ^4"`, so SDK 5
+      # cannot be installed alongside it. Upstream's inconsistency, not ours. api@5 +
+      # sdk@4 resolves and builds cleanly -- verified.
+      - dependency-name: 'azure-devops-extension-sdk'
+        update-types: ['version-update:semver-major']
+      #
+      # NOTE: the former '@types/node' major hold was REMOVED. vitest 5 requires
+      # @types/node@26 and cannot resolve without it. The hold existed so types could not
+      # run ahead of the Node20_1 handler -- that guard is gone, so a task using a
+      # post-Node-20 API will now typecheck. The e2e suite runs the real bundles and is the
+      # remaining backstop.
 
   - package-ecosystem: github-actions
     directory: /
