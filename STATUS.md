@@ -49,21 +49,28 @@ Nothing is blocked; what remains is polish.
 
 ## 💡 Later — backlog
 
-- **Make the run summary tab first-class.** `ArgoCDApp@1` already publishes a Markdown summary
-  (application table, sync/health icons, rendered diff) via `##vso[task.uploadsummary]`, but it is
-  undiscoverable and badly presented:
-  - **The tab is named after the file**, so it shows as `argocd-sync-1759012345678`
-    (`tasks/ArgoCDAppV1/index.ts:155`). `uploadSummary(file, title)` in
-    `packages/task-common/src/logging.ts:32` *takes* a title and never uses it — the parameter is
-    dead except in the error path. Fix: emit
-    `##vso[task.addattachment type=Distributedtask.Core.Summary;name=Argo CD;]<path>`, which sets
-    the displayed name explicitly.
-  - **Only `ArgoCDApp@1` publishes one.** `ArgoCDAppSet@1` (generated applications),
-    `ArgoCDProject@1` (roles and tokens) and `ArgoCDInstall@1` (resolved version, cache hit) all
-    have something worth showing.
-  - **Make the content much richer** — per-application links into the Argo CD UI, operation
-    timings, what changed since the previous revision, resource-level health breakdown.
-  - Worth documenting too: nothing in `docs/` currently mentions the summary exists.
+- **Finish the Argo CD tab.** The contributed `ms.vss-build-web.build-results-tab` is built
+  and `ArgoCDApp@1` populates it (applications, diffs, history, unhealthy resources). Left to
+  do: publish attachments from `ArgoCDAppSet@1`, `ArgoCDProject@1` and `ArgoCDAccount@1` --
+  their GUIDs are deliberately **absent** from `supportsTasks` until they do, because the tab
+  would otherwise appear on those builds saying "No Argo CD results". Then regenerate
+  `dev-fixtures/` from a real run so the preview cannot drift from what the tab receives, and
+  document the tab in `docs/`.
+
+- **Agent configuration for the repo.** There is no `AGENTS.md` and no
+  `.github/copilot-instructions.md`, so GitHub's Copilot coding agent and any other agent
+  pointed at this repo start with none of the project's conventions. `CLAUDE.md` is
+  gitignored, so it helps exactly one tool and no contributor. The conventions an agent would
+  otherwise get wrong are not stylistic -- they are load-bearing:
+  - esbuild for tasks but **webpack for the tab**, because `azure-devops-extension-api` is
+    AMD-only. "Simplifying" to one bundler silently breaks the tab.
+  - `trimSlashes()`, never `replace(/\/+$/, '')` -- the latter is polynomial and CodeQL flags it.
+  - Secrets go through `registerSecret`, never `tl.setSecret` directly, or the run attachment
+    guard cannot see them.
+  - Never list `marketplace/` in `vss-extension.json` `files[]`.
+  - `Array<T>` and bracket index access are deliberate, not oversights to tidy.
+  Most of this is already prose in this file; the work is distilling it into a tracked
+  `AGENTS.md` that every tool reads.
 
 - **Phase 4**: `ArgoCDCluster@1`, `ArgoCDRepo@1` (repocreds, certificates, GPG keys), Argo Rollouts,
   `patch-resource`. Least validated demand in the PRD — worth waiting for a user to ask.
@@ -136,6 +143,26 @@ Non-obvious facts that cost real time to find. All verified against the Argo CD 
   `@azdo-argocd/argocd-client`, which is two loops and linear. Inputs here are
   pipeline-author controlled rather than attacker controlled, so this was a self-inflicted
   hang at worst -- but it is free to avoid and reads better.
+- **Dependabot groups must match peer-dependency reality, not tidy categories** -- and the
+  constraint is usually DIRECTIONAL. `vitest` 5 pulls `vite` 8, which needs a newer
+  `esbuild` and `@types/node`; but `esbuild` updates perfectly well on its own (PR #6 was
+  green standalone, only PR #4 failed). Group what a bump *drags with it*, in that
+  direction.
+- **Check `engines`, not just peer ranges -- and check it on CI's Node, not yours.**
+  `vitest` 5 declares `node ^22.12 || ^24 || >=26`. It installed and ran fine locally on
+  Node 24 and would have failed on CI's Node 20. Raising CI's Node is not a free fix:
+  `test/support/run-task.ts` spawns the built bundles with `process.execPath`, so CI's Node
+  is what actually validates the `Node20_1` handler. Bumping it would quietly stop testing
+  the oldest agent runtime this extension supports.
+- **An `ERESOLVE` is usually "hold a version back", not "fix the code".** Two Dependabot PRs
+  failed before a single line compiled: `azure-devops-extension-api@5` still declares
+  `peer sdk@"^2 || ^3 || ^4"`, and `typescript-eslint` caps TypeScript at `<6.1.0` with no
+  release supporting 7. Both are upstream not being ready. npm's own error suggests
+  `--force` / `--legacy-peer-deps`, and an agent told to "make CI pass" will take that --
+  which silently installs a combination the publisher says is incompatible.
+- **For a grouped Dependabot PR, use the per-dependency comment command**:
+  `@dependabot ignore <name> major version` closes the PR, records the ignore, and reopens
+  the group without that major. No hand-written lockfile, no fighting Dependabot.
 - **`azure-devops-extension-api` ships only AMD modules.** esbuild cannot consume AMD at all,
   which is why the tab alone is bundled by webpack while every task uses esbuild. Not a
   preference -- see the comment at the top of `webpack.config.js`.
