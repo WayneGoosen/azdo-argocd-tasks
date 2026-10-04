@@ -8,6 +8,6 @@
     "dependencies": {
         "@azdo-argocd/cli-runner": "*",
         "@azdo-argocd/task-common": "*",
-        "azure-pipelines-task-lib": "^5.280.3"
+        "azure-pipelines-task-lib": "^5.281.0"
     }
 }
