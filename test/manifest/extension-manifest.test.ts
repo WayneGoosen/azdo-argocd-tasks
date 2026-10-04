@@ -22,8 +22,15 @@ interface TaskManifest {
     inputs: Array<{ name: string; type: string }>;
 }
 
+interface Contribution {
+    id: string;
+    type: string;
+    properties?: Record<string, unknown>;
+}
+
 interface ExtensionManifest {
     id: string;
+    scopes?: string[];
     contributions?: EndpointContribution[];
     public?: boolean;
     icons?: Record<string, string>;
@@ -140,6 +147,49 @@ describe('extension manifest', () => {
         }
 
         fs.rmSync(scratch, { recursive: true, force: true });
+    });
+
+    it('keeps the tab contribution pointing at a file that is actually published', () => {
+        // Two independent ways this silently yields a blank tab:
+        //   * the uri must be the repo-relative path, including dist/ -- tfx does not rewrite it
+        //   * dist/tab must be addressable, or it ships inside the VSIX with no URL and the
+        //     iframe 404s
+        const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'vss-extension.json'), 'utf8')) as {
+            contributions: Contribution[];
+            files: Array<{ path: string; addressable?: boolean }>;
+        };
+        const tab = raw.contributions.find((c) => c.type === 'ms.vss-build-web.build-results-tab');
+        expect(tab, 'no build-results-tab contribution').toBeDefined();
+
+        const uri = tab?.properties?.['uri'] as string;
+        expect(fs.existsSync(path.join(ROOT, uri.replace('dist/tab/', 'tab/'))), `${uri} has no source`).toBe(true);
+
+        const folder = raw.files.find((f) => f.path === 'dist/tab');
+        expect(folder, 'dist/tab is not in files[]').toBeDefined();
+        expect(folder?.addressable, 'dist/tab must be addressable or the iframe 404s').toBe(true);
+    });
+
+    it('lists only real task GUIDs in supportsTasks', () => {
+        // The tab appears only on builds that ran one of these GUIDs. If one drifts from the
+        // task.json it came from, the tab silently stops showing up -- no error anywhere.
+        const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'vss-extension.json'), 'utf8')) as {
+            contributions: Contribution[];
+        };
+        const tab = raw.contributions.find((c) => c.type === 'ms.vss-build-web.build-results-tab');
+        const declared = (tab?.properties?.['supportsTasks'] ?? []) as string[];
+        expect(declared.length).toBeGreaterThan(0);
+
+        const real = new Set(taskManifests().map((t) => (t as unknown as { id: string }).id));
+        for (const guid of declared) {
+            expect(real.has(guid), `${guid} in supportsTasks matches no task.json id`).toBe(true);
+        }
+        expect(new Set(declared).size, 'duplicate GUID in supportsTasks').toBe(declared.length);
+    });
+
+    it('declares the build scope the tab needs', () => {
+        // BuildRestClient.getAttachments needs vso.build. Note for releases: ADDING a scope
+        // makes every existing install require re-authorisation by an org admin.
+        expect(manifest.scopes ?? []).toContain('vso.build');
     });
 
     it('does not list marketplace/ in files[]', () => {

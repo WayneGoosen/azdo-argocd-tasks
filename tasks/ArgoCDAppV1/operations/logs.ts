@@ -34,7 +34,7 @@ export function readOptionalResource(): ResourceRef | undefined {
     if (parsed.length > 1) {
         throw new Error('Specify at most one resource when reading logs.');
     }
-    return parsed[0] as ResourceRef;
+    return parsed[0];
 }
 
 export async function runLogs(ctx: OperationContext): Promise<OperationOutcome> {

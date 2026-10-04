@@ -18,6 +18,9 @@ import {
     applicationUrl,
     describeError,
     readArgoCdEndpoint,
+    RunAttachment,
+    Verdict,
+    publishRunAttachment,
     setOutput,
     uploadSummary,
 } from '@azdo-argocd/task-common';
@@ -41,7 +44,48 @@ import {
 
 const SUMMARY_DIRECTORY = 'argocd-tasks';
 
+const VERDICT_RESULTS: Record<Verdict, RunAttachment['result']> = {
+    succeeded: 'Succeeded',
+    succeededWithIssues: 'SucceededWithIssues',
+    failed: 'Failed',
+};
+
+/** Assemble what the Argo CD tab renders from the snapshots every command produces. */
+function buildAttachment(
+    command: string,
+    serverUrl: string,
+    startedAt: string,
+    outcome: { decision: Decision; snapshots: AppSnapshot[]; attachment?: Partial<RunAttachment> },
+): RunAttachment {
+    return {
+        ...outcome.attachment,
+        schema: 1,
+        task: 'ArgoCDApp@1',
+        command,
+        // Task.DisplayName is what tells two Argo CD steps in one job apart.
+        step: tl.getVariable('Task.DisplayName') ?? undefined,
+        serverUrl,
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        result: VERDICT_RESULTS[outcome.decision.verdict],
+        applications: outcome.snapshots.map((s) => ({
+            name: s.name,
+            namespace: s.namespace,
+            project: s.project,
+            syncStatus: s.syncStatus,
+            healthStatus: s.healthStatus,
+            healthMessage: s.healthMessage,
+            operationPhase: s.operationPhase,
+            operationMessage: s.operationMessage,
+            revision: s.revision,
+            revisions: s.revisions,
+            url: applicationUrl(serverUrl, s.name, s.namespace),
+        })),
+    };
+}
+
 async function run(): Promise<void> {
+    const startedAt = new Date().toISOString();
     try {
         const endpoint = readArgoCdEndpoint('connection');
         const common = getCommonInputs();
@@ -76,9 +120,34 @@ async function run(): Promise<void> {
             writeSummary(outcome.summary, common.command);
         }
 
+        if (common.publishSummary) {
+            publishRunAttachment(buildAttachment(common.command, endpoint.url, startedAt, outcome));
+        }
+
         applyResult(outcome.decision);
     } catch (error) {
-        tl.setResult(tl.TaskResult.Failed, describeError(error));
+        const message = describeError(error);
+        // The failure path is exactly when someone goes looking for the tab, so publish a
+        // minimal attachment before reporting the failure rather than leaving it empty --
+        // but still honour publishSummary. Read it defensively: this catch also covers
+        // failures from before the inputs were parsed.
+        const mayPublish = tl.getInput('publishSummary', false) !== 'false';
+        try {
+            if (mayPublish) {
+                publishRunAttachment({
+                    schema: 1,
+                    task: 'ArgoCDApp@1',
+                    command: tl.getInput('command', false) ?? undefined,
+                    startedAt,
+                    finishedAt: new Date().toISOString(),
+                    result: 'Failed',
+                    error: message,
+                });
+            }
+        } catch {
+            /* Never let the attachment obscure the real failure below. */
+        }
+        tl.setResult(tl.TaskResult.Failed, message);
     }
 }
 

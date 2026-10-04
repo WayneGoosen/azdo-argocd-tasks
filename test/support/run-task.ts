@@ -135,6 +135,25 @@ export function summaryPathFrom(stdout: string): string | undefined {
     return line?.split('##vso[task.uploadsummary]')[1]?.trim();
 }
 
+/**
+ * Pull the path out of the `##vso[task.addattachment ...]` line for the Argo CD tab.
+ *
+ * task-lib emits `##vso[task.addattachment type=<type>;name=<name>;]<path>`.
+ */
+export function attachmentPathFrom(stdout: string, type = 'argocd-tasks.run'): string | undefined {
+    const line = stdout.split('\n').find((l) => l.includes('task.addattachment') && l.includes(`type=${type}`));
+    if (line === undefined) {
+        return undefined;
+    }
+    return line.slice(line.indexOf(']') + 1).trim();
+}
+
+/** Parse the run attachment the tab would read. */
+export function attachmentFrom(stdout: string): Record<string, unknown> | undefined {
+    const file = attachmentPathFrom(stdout);
+    return file === undefined ? undefined : (JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>);
+}
+
 /** Read an output variable from the emitted logging commands. */
 export function outputVariable(stdout: string, name: string): string | undefined {
     const marker = `##vso[task.setvariable variable=${name};isOutput=true;issecret=false;]`;

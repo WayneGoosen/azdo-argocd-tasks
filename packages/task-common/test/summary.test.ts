@@ -66,6 +66,20 @@ describe('renderUnhealthyResources', () => {
         expect(rendered).toContain('crash loop');
     });
 
+    it('escapes a backslash before the pipe it precedes', () => {
+        // Escaping `|` alone turns `a\\|b` into `a\\\\|b`: the doubled backslash renders
+        // literally and the pipe is then unescaped, splitting the cell. Found by CodeQL.
+        const rendered = renderUnhealthyResources([
+            { kind: 'Pod', name: 'p', health: { status: 'Degraded', message: 'a\\|b' } },
+        ] as never);
+        expect(rendered).toContain('a\\\\\\|b');
+        // The escaped pipe is still a `|` character, so count only UNESCAPED ones: four
+        // columns means five separators, and nothing from the message may add a sixth.
+        const row = rendered.split('\n').find((l) => l.includes('Degraded')) ?? '';
+        const unescaped = row.match(/(?<!\\)\|/g) ?? [];
+        expect(unescaped.length, 'the message leaked an unescaped pipe into the row').toBe(5);
+    });
+
     it('escapes pipes so a message cannot break the table', () => {
         const rendered = renderUnhealthyResources([
             { kind: 'Pod', name: 'p', health: { status: 'Degraded', message: 'a | b' } },

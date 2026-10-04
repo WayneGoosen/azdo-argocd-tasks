@@ -135,7 +135,7 @@ describeOnPosix('bundled ArgoCDInstall task', () => {
         expect(fs.existsSync(installedPath as string)).toBe(true);
 
         // It must be executable, since tool-lib does no chmod of its own.
-        // eslint-disable-next-line no-bitwise
+         
         expect(fs.statSync(installedPath as string).mode & 0o111).toBeGreaterThan(0);
     });
 

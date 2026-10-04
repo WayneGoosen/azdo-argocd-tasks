@@ -99,6 +99,52 @@ any red or warning lines from unrelated steps. Crop to the pane that matters —
 `pages.yml` copies `marketplace/images/*.png` into the docs site at build time, so the same
 files serve both the listing and the docs. `docs/assets/images/` is generated, not committed.
 
+## Code quality gates
+
+`pr.yml` runs lint, both typechecks, tests with coverage, packaging, and asserts the VSIX
+actually contains what the listing and the tab need. `main` requires the `build` check.
+
+**Every action is pinned to a full commit SHA**, with the version in a trailing comment:
+
+```yaml
+- uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+```
+
+A tag is mutable. `@v4` and even `@v4.4.0` can be repointed at different code by whoever owns
+the repository, which on a workflow holding `ADO_PUBLISHER_PAT` means someone else choosing what
+runs with your publishing credentials. A SHA cannot be repointed. Do not "tidy" these back to
+tags; Dependabot updates SHA pins and rewrites the version comment for you.
+
+To re-pin after changing a version:
+
+```sh
+gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq '.object.sha'
+```
+
+If `.object.type` is `tag` rather than `commit` it is an annotated tag — dereference it with
+`gh api repos/<owner>/<repo>/git/tags/<sha> --jq '.object.sha'` to get the commit.
+
+**SonarCloud is configured but not yet connected.** `sonar-project.properties` assumes
+`organization=waynegoosen` and `projectKey=WayneGoosen_azdo-argocd-tasks`. To turn it on:
+
+1. Import the repo at <https://sonarcloud.io> (free for public repositories) and confirm the
+   organization and project key match the properties file.
+2. Create a token and add it:
+   ```sh
+   gh secret set SONAR_TOKEN --repo WayneGoosen/azdo-argocd-tasks
+   ```
+3. In SonarCloud, set the project's analysis method to **CI-based**, not Automatic Analysis.
+   Leaving Automatic on makes the scanner step fail with "you are running manual analysis
+   while Automatic Analysis is enabled".
+
+Until the secret exists the SonarCloud step **skips itself**, deliberately — `build` is a
+required check and must never fail because an optional integration is unconfigured.
+
+**Coverage is understated and that is expected.** The e2e suite runs the *bundled* artifacts
+in a child process, which v8 coverage cannot instrument, so a well-tested task entry point
+reads as uncovered. `**/index.ts` is excluded for that reason. Judge coverage on
+`packages/*/src`, not on the overall number.
+
 ## Credentials — and the deadline
 
 `marketplace-publish.yml` uses `secrets.ADO_PUBLISHER_PAT`, a PAT with the **Marketplace:

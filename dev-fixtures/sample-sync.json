@@ -1,0 +1,82 @@
+{
+    "schema": 1,
+    "task": "ArgoCDApp@1",
+    "command": "sync",
+    "step": "Deploy payments",
+    "serverUrl": "https://argocd.example.com",
+    "startedAt": "2026-10-02T09:14:02.000Z",
+    "finishedAt": "2026-10-02T09:15:47.000Z",
+    "result": "SucceededWithIssues",
+    "applications": [
+        {
+            "name": "payments-api",
+            "namespace": "argocd",
+            "project": "payments",
+            "syncStatus": "Synced",
+            "healthStatus": "Healthy",
+            "operationPhase": "Succeeded",
+            "revision": "4f9a2c17b3d8e5016a7c9f2e4b8d1a3c6e0f5b29",
+            "revisions": ["4f9a2c17b3d8e5016a7c9f2e4b8d1a3c6e0f5b29"],
+            "url": "https://argocd.example.com/applications/payments-api"
+        },
+        {
+            "name": "payments-worker",
+            "namespace": "argocd",
+            "project": "payments",
+            "syncStatus": "Synced",
+            "healthStatus": "Progressing",
+            "operationPhase": "Running",
+            "revision": "1.14.2,8c3e1f90a4b7d2650e9f8a1c3b5d7e2f4a6c8019",
+            "revisions": ["1.14.2", "8c3e1f90a4b7d2650e9f8a1c3b5d7e2f4a6c8019"],
+            "url": "https://argocd.example.com/applications/payments-worker"
+        },
+        {
+            "name": "payments-ledger",
+            "namespace": "argocd",
+            "project": "payments",
+            "syncStatus": "OutOfSync",
+            "healthStatus": "Degraded",
+            "healthMessage": "Back-off restarting failed container",
+            "operationPhase": "Failed",
+            "operationMessage": "one or more objects failed to apply",
+            "revision": "d2b4f6081a3c5e790b2d4f6a8c0e2f4a6b8d0c13",
+            "url": "https://argocd.example.com/applications/payments-ledger"
+        }
+    ],
+    "unhealthy": [
+        {
+            "group": "apps",
+            "kind": "Deployment",
+            "namespace": "payments",
+            "name": "ledger",
+            "health": "Degraded",
+            "message": "Back-off restarting failed container ledger in pod ledger-7d9f8c-x2k4p"
+        },
+        {
+            "kind": "Pod",
+            "namespace": "payments",
+            "name": "ledger-7d9f8c-x2k4p",
+            "health": "Degraded",
+            "message": "CrashLoopBackOff"
+        }
+    ],
+    "diffs": [
+        {
+            "group": "apps",
+            "kind": "Deployment",
+            "namespace": "payments",
+            "name": "ledger",
+            "added": 3,
+            "removed": 2,
+            "patch": "--- live\n+++ desired\n@@ -12,8 +12,9 @@\n   template:\n     spec:\n       containers:\n         - name: ledger\n-          image: registry.example.com/ledger:1.8.0\n-          replicas: 2\n+          image: registry.example.com/ledger:1.9.0\n+          replicas: 3\n+          imagePullPolicy: IfNotPresent\n           ports:\n             - containerPort: 8080"
+        },
+        {
+            "kind": "ConfigMap",
+            "namespace": "payments",
+            "name": "ledger-config",
+            "added": 1,
+            "removed": 1,
+            "patch": "--- live\n+++ desired\n@@ -3,5 +3,5 @@\n data:\n   LOG_LEVEL: info\n-  BATCH_SIZE: \"100\"\n+  BATCH_SIZE: \"250\"\n   TIMEOUT: 30s"
+        }
+    ]
+}

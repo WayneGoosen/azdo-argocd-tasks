@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
-import { ensureBuilt, outputVariable, runTask, summaryPathFrom } from '../support/run-task';
+import { attachmentFrom, ensureBuilt, outputVariable, runTask, summaryPathFrom } from '../support/run-task';
 
 const TOKEN = 'super-secret-argocd-token';
 
@@ -343,6 +343,86 @@ describe('bundled ArgoCDApp task', () => {
         });
 
         expect(stdout).toContain('##vso[task.complete result=Failed');
+    });
+
+    it('publishes a run attachment for the Argo CD tab', async () => {
+        resetScenario({ applications: [application({})] });
+
+        const { stdout } = await runAppTask({
+            command: 'get',
+            applications: 'payments',
+            project: 'payments',
+            publishSummary: 'false',
+        });
+
+        // publishSummary gates the tab attachment too -- it is the same opt-out.
+        expect(attachmentFrom(stdout), 'attachment published despite publishSummary=false').toBeUndefined();
+
+        const second = await runAppTask({
+            command: 'get',
+            applications: 'payments',
+            project: 'payments',
+            publishSummary: 'true',
+        });
+
+        const run = attachmentFrom(second.stdout) as
+            | { schema: number; task: string; command: string; applications: Array<Record<string, unknown>> }
+            | undefined;
+        expect(run, 'no run attachment was published').toBeDefined();
+        expect(run?.schema, 'the tab switches on this').toBe(1);
+        expect(run?.task).toBe('ArgoCDApp@1');
+        expect(run?.command).toBe('get');
+        expect(run?.applications?.[0]).toMatchObject({ name: 'payments', syncStatus: 'Synced', healthStatus: 'Healthy' });
+    });
+
+    it('publishes the diff into the attachment, not just the Markdown summary', async () => {
+        // The tab's diff section is populated from here. Before this was wired, the section
+        // existed and rendered correctly from fixtures but was always empty in production.
+        resetScenario({
+            applications: [application({})],
+            managedResources: {
+                items: [
+                    {
+                        group: 'apps',
+                        kind: 'Deployment',
+                        namespace: 'prod',
+                        name: 'api',
+                        modified: true,
+                        liveState: JSON.stringify({ spec: { replicas: 2 } }),
+                        targetState: JSON.stringify({ spec: { replicas: 3 } }),
+                    },
+                    { kind: 'ConfigMap', name: 'unchanged', modified: false, liveState: '{}', targetState: '{}' },
+                ],
+            },
+        });
+
+        const { stdout } = await runAppTask({
+            command: 'diff',
+            applications: 'payments',
+            project: 'payments',
+            failOnDiff: 'false',
+            publishSummary: 'true',
+        });
+
+        const run = attachmentFrom(stdout) as { diffs?: Array<Record<string, unknown>> } | undefined;
+        expect(run?.diffs, 'the attachment carried no diffs').toHaveLength(1);
+        expect(run?.diffs?.[0]).toMatchObject({ group: 'apps', kind: 'Deployment', name: 'api' });
+        expect(String(run?.diffs?.[0]?.['patch'])).toContain('replicas');
+    });
+
+    it('never puts the connection token in the attachment', async () => {
+        // The attachment is a file we write and publish; the agent masks its log stream, not
+        // this. The endpoint token is registered as a secret, so the guard must catch it.
+        resetScenario({ applications: [application({})] });
+        const { stdout } = await runAppTask({
+            command: 'get',
+            applications: 'payments',
+            project: 'payments',
+            publishSummary: 'true',
+        });
+        const raw = JSON.stringify(attachmentFrom(stdout) ?? {});
+        expect(raw).not.toContain(TOKEN);
+        expect(raw.length, 'attachment was empty, so the assertion above proved nothing').toBeGreaterThan(50);
     });
 
     it('fails with a readable message when no application is specified', async () => {

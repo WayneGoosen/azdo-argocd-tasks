@@ -5,7 +5,7 @@
 
 import * as tl from 'azure-pipelines-task-lib/task';
 import { Application, ArgoCdClient, ResourceNode, revisionOf, revisionsOf } from '@azdo-argocd/argocd-client';
-import { AppSnapshot, Decision } from '@azdo-argocd/task-common';
+import { AppSnapshot, Decision, RunAttachment } from '@azdo-argocd/task-common';
 import { ApplicationRef, CommonInputs } from '../inputs';
 
 export interface OperationContext {
@@ -19,6 +19,14 @@ export interface OperationOutcome {
     snapshots: AppSnapshot[];
     summary: string | undefined;
     extraOutputs: Record<string, string>;
+    /**
+     * Structured extras for the Argo CD tab -- diffs, history, generated applications.
+     *
+     * Optional and additive: a command that does not set it still gets the application table,
+     * which is built from `snapshots`. Operations opt in one at a time rather than every one
+     * having to be rewritten before the tab works at all.
+     */
+    attachment?: Partial<RunAttachment>;
 }
 
 function nonEmpty(values: string[]): string[] | undefined {
@@ -30,6 +38,7 @@ export function toSnapshot(app: Application, fallbackName: string): AppSnapshot 
     return {
         name: app.metadata?.name ?? fallbackName,
         namespace: app.metadata?.namespace,
+        project: app.spec?.project,
         syncStatus: status?.sync?.status,
         healthStatus: status?.health?.status,
         healthMessage: status?.health?.message,

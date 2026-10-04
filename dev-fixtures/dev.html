@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Argo CD tab — local preview</title>
+    <link rel="stylesheet" href="tab.css">
+    <link rel="stylesheet" href="dev.css">
+</head>
+<body>
+    <!--
+      Set the bypass flag BEFORE tab.js runs. tab.ts evaluates it at module top level, so if
+      it lands late, bootstrap() fires and tries to reach an Azure DevOps host that is not
+      there. dev.js then drives renderRuns() with fixture-backed refs.
+    -->
+    <script>window.__ARGOCD_DEV__ = true;</script>
+    <div class="dev-bar">
+        <strong>Local preview</strong>
+        <span>no Azure DevOps — fixtures only</span>
+        <label><input type="checkbox" id="dark"> Dark theme</label>
+    </div>
+    <div id="container"></div>
+    <script src="tab.js"></script>
+    <script src="dev.js"></script>
+</body>
+</html>

@@ -5,6 +5,9 @@
 // environment, and the assertions check the token reaches the process environment and never
 // the command line.
 
+// `$` is escaped throughout the embedded shell script below for consistency with the
+// `\${...}` forms that genuinely need it, so a lone `\$` reads as deliberate.
+/* eslint-disable no-useless-escape */
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';

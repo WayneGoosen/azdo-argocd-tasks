@@ -23,6 +23,7 @@ import {
     newTokenId,
     parseDurationSeconds,
     readArgoCdEndpoint,
+    registerSecret,
     setOutput,
 } from '@azdo-argocd/task-common';
 
@@ -166,7 +167,7 @@ async function runCreateToken(client: ArgoCdClient): Promise<void> {
     }
 
     // Mask before anything else can print it.
-    tl.setSecret(token);
+    registerSecret(token);
     setOutput('token', token, true);
     setOutput('tokenId', id);
 

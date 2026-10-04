@@ -22,6 +22,8 @@ export type WaitCondition = 'sync' | 'health' | 'operation' | 'suspended';
 export interface AppSnapshot {
     name: string;
     namespace?: string | undefined;
+    /** spec.project. The tab shows it, and it disambiguates same-named apps. */
+    project?: string | undefined;
     syncStatus?: SyncStatusCode | undefined;
     healthStatus?: HealthStatusCode | undefined;
     healthMessage?: string | undefined;

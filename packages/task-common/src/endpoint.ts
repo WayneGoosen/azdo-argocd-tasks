@@ -4,6 +4,7 @@
 // downstream (including error messages from the client) is therefore safe to print.
 
 import * as tl from 'azure-pipelines-task-lib/task';
+import { registerSecret } from './secrets';
 
 export interface ArgoCdEndpoint {
     url: string;
@@ -40,7 +41,9 @@ export function readArgoCdEndpoint(inputName: string): ArgoCdEndpoint {
             );
         }
         // Mask first, use second. Everything after this point may be logged freely.
-        tl.setSecret(token);
+        // registerSecret also records it, so anything we write to a file and publish can be
+        // checked against it -- tl.setSecret alone only masks the agent's log stream.
+        registerSecret(token);
     } else if (scheme !== AUTH_SCHEME_NONE) {
         throw new Error(
             `Unsupported authentication scheme "${scheme}" on the Argo CD service connection. ` +

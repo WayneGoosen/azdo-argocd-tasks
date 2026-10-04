@@ -1,0 +1,15 @@
+{
+    "schema": 1,
+    "task": "ArgoCDProject@1",
+    "command": "list-tokens",
+    "step": "Audit CI tokens",
+    "serverUrl": "https://argocd.example.com",
+    "finishedAt": "2026-10-02T09:17:30.000Z",
+    "result": "Succeeded",
+    "tokens": [
+        { "id": "4f1a2b3c-0000-4aaa-8bbb-ccccdddd0001", "subject": "proj:payments:ado-ci", "issuedAt": 1756684800, "expiresAt": 1764460800 },
+        { "id": "7c2d9e40-1111-4bbb-9ccc-ddddeeee0002", "subject": "proj:payments:ado-ci", "issuedAt": 1751500800, "expiresAt": 1759276800 },
+        { "id": "a9e3f1b2-2222-4ccc-8ddd-eeeeffff0003", "subject": "proj:payments:readonly", "issuedAt": 1748822400 }
+    ],
+    "notes": ["Two tokens expire within 30 days."]
+}

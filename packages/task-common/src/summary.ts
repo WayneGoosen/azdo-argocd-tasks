@@ -57,7 +57,13 @@ export function renderUnhealthyResources(nodes: readonly ResourceNode[]): string
     const header = '| Kind | Name | Health | Message |\n| --- | --- | --- | --- |';
     const rows = unhealthy.map((node) => {
         const kind = `${node.group === undefined || node.group === '' ? '' : `${node.group}/`}${node.kind ?? '?'}`;
-        const message = (node.health?.message ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+        // Backslashes FIRST. Escaping the pipe alone turns an input of `a\|b` into
+        // `a\\|b`, where the doubled backslash renders literally and the pipe is left
+        // unescaped -- breaking the table cell. Same ordering trap as percent-encoding.
+        const message = (node.health?.message ?? '')
+            .replace(/\\/g, '\\\\')
+            .replace(/\|/g, '\\|')
+            .replace(/\n/g, ' ');
         return `| \`${kind}\` | ${node.name ?? '?'} | ${node.health?.status ?? 'Unknown'} | ${message} |`;
     });
     return ['#### Unhealthy resources', '', header, ...rows].join('\n');

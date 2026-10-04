@@ -1,0 +1,11 @@
+{
+    "schema": 1,
+    "task": "ArgoCDApp@1",
+    "command": "sync",
+    "step": "Deploy checkout",
+    "serverUrl": "https://argocd.example.com",
+    "finishedAt": "2026-10-02T09:18:05.000Z",
+    "result": "Failed",
+    "error": "Argo CD returned HTTP 403: permission denied for application checkout-api in project checkout",
+    "applications": []
+}

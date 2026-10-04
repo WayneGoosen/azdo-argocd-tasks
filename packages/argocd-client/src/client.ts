@@ -1,3 +1,4 @@
+import { trimSlashes } from './text';
 // Typed client for the Argo CD REST API (grpc-gateway, /api/v1/...).
 //
 // Everything awkward about this API is encoded here rather than left to callers:
@@ -898,7 +899,7 @@ export class ArgoCdClient {
 export function normaliseBaseUrl(serverUrl: string): string {
     const trimmed = serverUrl.trim();
     const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    return withScheme.replace(/\/+$/, '');
+    return trimSlashes(withScheme);
 }
 
 /**
@@ -1102,7 +1103,7 @@ export function explainRollbackFailure(error: unknown): unknown {
 
 /** Path segment sanitiser that preserves the slashes inside a multi-segment subresource. */
 function cleanPathSegment(value: string): string {
-    return value.trim().replace(/^\/+|\/+$/g, '');
+    return trimSlashes(value.trim(), 'both');
 }
 
 /**

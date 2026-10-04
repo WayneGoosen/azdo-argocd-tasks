@@ -88,7 +88,9 @@ async function run(): Promise<void> {
         } as { [key: string]: string };
 
         const workingDirectory = tl.getPathInput('workingDirectory', false, true);
-        const exitCode = await runner.exec({
+        // execAsync, not exec: the latter is deprecated and returns a Q promise rather than
+        // a native one, which makes its result untyped to callers.
+        const exitCode = await runner.execAsync({
             cwd: workingDirectory,
             env: childEnvironment,
             failOnStdErr: tl.getBoolInput('failOnStderr', false),
