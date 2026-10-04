@@ -115,7 +115,9 @@ export async function waitForApplications(options: WaitOptions): Promise<WaitRes
     const deadlineMs = options.timeoutSeconds * 1000;
     const startedAt = now();
 
-    let snapshots: AppSnapshot[] = [];
+    // No initialiser: the loop below assigns before anything reads it, and an empty array
+    // here would be a lie about the state if that ever stopped being true.
+    let snapshots: AppSnapshot[];
     let polls = 0;
 
     for (;;) {
