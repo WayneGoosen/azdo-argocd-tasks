@@ -2,7 +2,10 @@
     "extends": "./tsconfig.json",
     "compilerOptions": {
         "module": "ESNext",
-        "moduleResolution": "node",
+        // bundler, not node16: the tab is ESM consumed by webpack, which resolves the way
+        // a bundler does rather than the way Node does. node16 would demand explicit file
+        // extensions on relative imports for no benefit here.
+        "moduleResolution": "bundler",
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
         "types": [],
         "noEmit": true
