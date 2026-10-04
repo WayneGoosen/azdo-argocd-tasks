@@ -8,7 +8,7 @@
     "types": "src/index.ts",
     "dependencies": {
         "@azdo-argocd/argocd-client": "*",
-        "azure-pipelines-task-lib": "^5.280.3",
+        "azure-pipelines-task-lib": "^5.281.0",
         "azure-pipelines-tool-lib": "^2.281.0"
     },
     "sideEffects": false
