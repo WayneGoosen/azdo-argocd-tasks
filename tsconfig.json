@@ -2,8 +2,14 @@
     "compilerOptions": {
         "target": "ES2022",
         "lib": ["ES2022"],
-        "module": "commonjs",
-        "moduleResolution": "node",
+        // node16, not commonjs/node10. TypeScript 6 deprecates moduleResolution=node10
+        // (TS5107) and TypeScript 7 removes it. node16 is the accurate model for what these
+        // tasks actually are -- CommonJS packages resolved by Node -- and it typechecks
+        // clean today on TypeScript 5, so this lands independently of the TS 6 bump.
+        // `ignoreDeprecations: "6.0"` is NOT an alternative: TypeScript 5 rejects that value
+        // outright (TS5103), so it cannot be applied ahead of the upgrade.
+        "module": "node16",
+        "moduleResolution": "node16",
         "strict": true,
         "noUncheckedIndexedAccess": true,
         "exactOptionalPropertyTypes": false,
