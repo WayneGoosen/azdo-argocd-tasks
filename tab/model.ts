@@ -151,3 +151,41 @@ export function diffLineClass(line: string): string {
     }
     return '';
 }
+
+/** What the tab needs before it can fetch anything. */
+export interface BuildContext {
+    projectId: string;
+    buildId: number;
+}
+
+/**
+ * Resolve the project and build the tab is attached to.
+ *
+ * Takes the service methods as plain callbacks returning `unknown`, and awaits whatever
+ * comes back. That is deliberate: everything from `SDK.getService()` is an XDM proxy whose
+ * methods ALWAYS return a Promise, while the published `.d.ts` declares some of them
+ * synchronous. Depending on the declaration shipped a broken tab in 1.0.15.
+ *
+ * Awaiting an already-resolved value is a no-op, so this is correct whichever the SDK does
+ * -- the bug class is removed rather than patched.
+ */
+export async function resolveBuildContext(
+    getProject: () => unknown,
+    getBuildPageData: () => unknown,
+): Promise<BuildContext> {
+    const project = (await getProject()) as { id?: string } | undefined;
+    const buildPageData = (await getBuildPageData()) as { build?: { id?: number } } | undefined;
+
+    const projectId = project?.id;
+    if (projectId === undefined || projectId === '') {
+        throw new Error('Azure DevOps did not provide the project context for this tab.');
+    }
+    const buildId = buildPageData?.build?.id;
+    if (typeof buildId !== 'number') {
+        throw new Error(
+            'Azure DevOps did not provide the build context for this tab. This tab only ' +
+                'works on a build (pipeline run) results page.',
+        );
+    }
+    return { projectId, buildId };
+}

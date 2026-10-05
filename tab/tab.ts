@@ -20,6 +20,7 @@ import {
     diffLineClass,
     healthTone,
     parseAttachmentHref,
+    resolveBuildContext,
     phaseTone,
     shortRevision,
     syncTone,
@@ -364,14 +365,12 @@ interface AttachmentLike {
 async function listRuns(): Promise<{ refs: AttachmentRef[]; fetch: RunFetcher }> {
     const projectService = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
     const buildService = await SDK.getService<IBuildPageDataService>(BuildServiceIds.BuildPageDataService);
-    const project = await projectService.getProject();
-    // getBuildPageData is synchronous despite sitting next to async service calls.
-    const buildPageData = buildService.getBuildPageData();
-    const projectId = project?.id;
-    const buildId = buildPageData?.build?.id;
-    if (projectId === undefined || buildId === undefined) {
-        throw new Error('This tab could not identify the build it is attached to.');
-    }
+    // Both are XDM proxies; resolveBuildContext awaits whatever they return, so it is
+    // correct whether the SDK's declaration says sync or async. See its doc comment.
+    const { projectId, buildId } = await resolveBuildContext(
+        () => projectService.getProject(),
+        () => buildService.getBuildPageData(),
+    );
 
     const client = getClient(BuildRestClient);
     const attachments = (await client.getAttachments(projectId, buildId, RUN_ATTACHMENT_TYPE)) as AttachmentLike[];
@@ -383,6 +382,11 @@ async function listRuns(): Promise<{ refs: AttachmentRef[]; fetch: RunFetcher }>
             refs.push(ref);
         }
     }
+
+    // Stable order. getAttachments' ordering is not documented, so without sorting the step
+    // dropdown can come back in a different order on the same build. The attachment names
+    // carry a sequence suffix, so this is also chronological.
+    refs.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
     const fetch: RunFetcher = async (ref) => {
         const buffer = await client.getAttachment(projectId, buildId, ref.timelineId, ref.recordId, RUN_ATTACHMENT_TYPE, ref.name);
@@ -407,10 +411,12 @@ async function bootstrap(): Promise<void> {
         // Returns a promise: dropping it races the host's own loading state.
         await SDK.notifyLoadSucceeded();
     } catch (error) {
+        // .message, not String(error) -- the latter renders as "Error: ..." in the UI.
+        const detail = error instanceof Error ? error.message : String(error);
         root.textContent = '';
-        root.appendChild(statusBlock('Could not load Argo CD results.', String(error), 'status-error'));
+        root.appendChild(statusBlock('Could not load Argo CD results.', detail, 'status-error'));
         try {
-            await SDK.notifyLoadFailed(String(error));
+            await SDK.notifyLoadFailed(detail);
         } catch {
             /* SDK may not have initialised; nothing useful to do. */
         }

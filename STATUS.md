@@ -170,6 +170,26 @@ Non-obvious facts that cost real time to find. All verified against the Argo CD 
 - **For a grouped Dependabot PR, use the per-dependency comment command**:
   `@dependabot ignore <name> major version` closes the PR, records the ignore, and reopens
   the group without that major. No hand-written lockfile, no fighting Dependabot.
+- **`azdo-tf-plan-viewer` is a WORKING reference for the tab -- read the source, not a
+  summary of it.** The 1.0.15 build-context bug existed verbatim-correct in that repo
+  (`tab/tab.ts:763`) and in the research notes taken from it. It was still shipped broken
+  here, because the networking section of those notes was skipped while the build config and
+  gotchas were read closely. When this repo's tab and that one disagree, that one is right
+  until proven otherwise -- it has been running in production far longer.
+- **Everything from `SDK.getService()` is an XDM proxy whose methods ALWAYS return a
+  Promise -- the `.d.ts` lies.** `IBuildPageDataService.getBuildPageData()` is declared
+  `IBuildPageData | undefined`, but the proxy routes every call through
+  `XDMChannel.invokeRemoteMethod`, which is async. The declaration describes the REMOTE
+  signature, not the local proxy. **This shipped broken in 1.0.15**: typescript-eslint's
+  `await-thenable` flagged the `await` as unnecessary (correctly, per the type), the await
+  was removed, and the tab then reported "could not identify the build it is attached to"
+  because `buildPageData` was a pending Promise. Lesson: a type-aware lint rule is only as
+  correct as the declaration, and for RPC proxies the declaration is about the far side.
+  `tab/model.ts:resolveBuildContext` now awaits `unknown` returns so it is correct either
+  way, with tests covering both shapes.
+- **Give each failed precondition its own message.** The original error collapsed "no
+  project" and "no build" into one sentence, so a real report could not say which half
+  failed. Separate messages, and say where the tab *does* work.
 - **`azure-devops-extension-api` ships only AMD modules.** esbuild cannot consume AMD at all,
   which is why the tab alone is bundled by webpack while every task uses esbuild. Not a
   preference -- see the comment at the top of `webpack.config.js`.

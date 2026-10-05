@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     countApplications,
+    resolveBuildContext,
     describeRun,
     diffLineClass,
     healthTone,
@@ -134,5 +135,53 @@ describe('describeRun', () => {
 
     it('falls back to the attachment name when there is no run', () => {
         expect(describeRun(undefined, 'attachment-1')).toBe('attachment-1');
+    });
+});
+
+describe('resolveBuildContext', () => {
+    const project = { id: 'proj-guid' };
+    const pageData = { build: { id: 4242 } };
+
+    it('works when the services return PROMISES, which is what they actually do', async () => {
+        // This is the real shape. Everything from SDK.getService() is an XDM proxy and every
+        // method on it returns a Promise -- even the ones the .d.ts declares synchronous.
+        // Trusting the declaration and dropping the await shipped a broken tab in 1.0.15,
+        // where the tab reported "could not identify the build it is attached to".
+        const ctx = await resolveBuildContext(
+            () => Promise.resolve(project),
+            () => Promise.resolve(pageData),
+        );
+        expect(ctx).toEqual({ projectId: 'proj-guid', buildId: 4242 });
+    });
+
+    it('also works when they return values directly, as the types claim', async () => {
+        // Awaiting a non-promise is a no-op, so the resolver is correct either way and the
+        // tab cannot break again if the SDK changes which it does.
+        const ctx = await resolveBuildContext(
+            () => project,
+            () => pageData,
+        );
+        expect(ctx).toEqual({ projectId: 'proj-guid', buildId: 4242 });
+    });
+
+    it('names the project as the missing piece, not just "something failed"', async () => {
+        await expect(
+            resolveBuildContext(() => undefined, () => Promise.resolve(pageData)),
+        ).rejects.toThrow(/project context/i);
+    });
+
+    it('names the build, and says where the tab does work', async () => {
+        await expect(
+            resolveBuildContext(() => Promise.resolve(project), () => Promise.resolve({})),
+        ).rejects.toThrow(/build context/i);
+    });
+
+    it('rejects a non-numeric build id rather than passing it to the REST client', async () => {
+        await expect(
+            resolveBuildContext(
+                () => Promise.resolve(project),
+                () => Promise.resolve({ build: { id: '4242' } }),
+            ),
+        ).rejects.toThrow(/build context/i);
     });
 });
