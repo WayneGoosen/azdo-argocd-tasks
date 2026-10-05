@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     countApplications,
+    orderAttachments,
     resolveBuildContext,
     describeRun,
     diffLineClass,
@@ -176,6 +177,20 @@ describe('resolveBuildContext', () => {
         ).rejects.toThrow(/build context/i);
     });
 
+    it('rejects a non-string project id, which the cast would otherwise let through', async () => {
+        await expect(
+            resolveBuildContext(() => Promise.resolve({ id: 42 }), () => Promise.resolve(pageData)),
+        ).rejects.toThrow(/project context/i);
+    });
+
+    it.each([NaN, Infinity, 1.5, 0, -3])('rejects build id %s', async (bad) => {
+        // typeof x === 'number' admits all of these; each would become a confusing REST
+        // failure instead of a clear "this tab needs a build" message.
+        await expect(
+            resolveBuildContext(() => Promise.resolve(project), () => Promise.resolve({ build: { id: bad } })),
+        ).rejects.toThrow(/build context/i);
+    });
+
     it('rejects a non-numeric build id rather than passing it to the REST client', async () => {
         await expect(
             resolveBuildContext(
@@ -183,5 +198,39 @@ describe('resolveBuildContext', () => {
                 () => Promise.resolve({ build: { id: '4242' } }),
             ),
         ).rejects.toThrow(/build context/i);
+    });
+});
+
+describe('orderAttachments', () => {
+    const ref = (name: string, recordId: string, timelineId = 't1') => ({ name, recordId, timelineId });
+
+    it('is deterministic when names COLLIDE, which they do across steps', () => {
+        // publish-attachment.ts numbers from a module-level counter and every task step is
+        // its own process, so two ArgoCDApp@1 sync steps both emit "ArgoCDApp1-sync-1".
+        // Sorting on name alone leaves them tied and the undocumented API order wins.
+        const a = [ref('ArgoCDApp1-sync-1', 'rec-b'), ref('ArgoCDApp1-sync-1', 'rec-a')];
+        const b = [ref('ArgoCDApp1-sync-1', 'rec-a'), ref('ArgoCDApp1-sync-1', 'rec-b')];
+        expect(orderAttachments(a).map((r) => r.recordId)).toEqual(['rec-a', 'rec-b']);
+        expect(orderAttachments(b).map((r) => r.recordId)).toEqual(['rec-a', 'rec-b']);
+    });
+
+    it('gives colliding names distinct labels so the dropdown is usable', () => {
+        const out = orderAttachments([
+            ref('ArgoCDApp1-sync-1', 'rec-a'),
+            ref('ArgoCDApp1-sync-1', 'rec-b'),
+            ref('ArgoCDApp1-diff-1', 'rec-c'),
+        ]);
+        expect(out.map((r) => r.label)).toEqual([
+            'ArgoCDApp1-diff-1',
+            'ArgoCDApp1-sync-1',
+            'ArgoCDApp1-sync-1 (2)',
+        ]);
+    });
+
+    it('sorts by name first, and does not mutate the input', () => {
+        const input = [ref('b-1', 'r2'), ref('a-1', 'r1')];
+        const out = orderAttachments(input);
+        expect(out.map((r) => r.name)).toEqual(['a-1', 'b-1']);
+        expect(input.map((r) => r.name)).toEqual(['b-1', 'a-1']);
     });
 });

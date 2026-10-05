@@ -21,6 +21,12 @@ const OUTPUT_DIRECTORY = 'argocd-tasks';
  * Attachment names must be unique within a step, or a later attachment silently REPLACES an
  * earlier one -- no error, no warning, the first one simply disappears. A counter is enough
  * because attachments are scoped to the timeline record, which is the step.
+ *
+ * NOTE it is only unique WITHIN a step: this is module state and every task step is its own
+ * process, so two ArgoCDApp@1 steps both running `sync` in one build each emit
+ * "ArgoCDApp1-sync-1". That is harmless for storage (different timeline records) but means
+ * the tab cannot treat the name as an identifier -- see `orderAttachments` in tab/model.ts,
+ * which breaks ties on recordId and disambiguates the labels.
  */
 let sequence = 0;
 

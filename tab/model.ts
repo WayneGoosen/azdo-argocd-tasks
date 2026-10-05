@@ -176,16 +176,48 @@ export async function resolveBuildContext(
     const project = (await getProject()) as { id?: string } | undefined;
     const buildPageData = (await getBuildPageData()) as { build?: { id?: number } } | undefined;
 
+    // These are `unknown` on purpose, so the checks must actually validate the shape rather
+    // than only test for absence. A non-string id would otherwise satisfy the declared type
+    // at compile time and reach the REST client as garbage at run time.
     const projectId = project?.id;
-    if (projectId === undefined || projectId === '') {
+    if (typeof projectId !== 'string' || projectId === '') {
         throw new Error('Azure DevOps did not provide the project context for this tab.');
     }
     const buildId = buildPageData?.build?.id;
-    if (typeof buildId !== 'number') {
+    // Integer and positive: `typeof x === 'number'` also admits NaN, Infinity and 1.5, any
+    // of which would turn a clear context error into a confusing REST failure.
+    if (typeof buildId !== 'number' || !Number.isInteger(buildId) || buildId <= 0) {
         throw new Error(
             'Azure DevOps did not provide the build context for this tab. This tab only ' +
                 'works on a build (pipeline run) results page.',
         );
     }
     return { projectId, buildId };
+}
+
+/**
+ * Order attachments deterministically, and give colliding names distinct labels.
+ *
+ * Attachment names are NOT unique across a build. `publish-attachment.ts` numbers them from
+ * a module-level counter, and every task step is its own process, so two `ArgoCDApp@1`
+ * steps both running `sync` each produce `ArgoCDApp1-sync-1`. Sorting on name alone leaves
+ * those tied, and a stable sort then preserves whatever order the API happened to return --
+ * which is not documented, so the dropdown could reorder between loads of the same build.
+ *
+ * Ties break on recordId (the timeline record, i.e. the step), which is unique and stable.
+ * Duplicated names also get a " (2)", " (3)" suffix so the dropdown is actually usable.
+ */
+export function orderAttachments(refs: readonly AttachmentRef[]): Array<AttachmentRef & { label: string }> {
+    const sorted = [...refs].sort(
+        (a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) ||
+            a.recordId.localeCompare(b.recordId) ||
+            a.timelineId.localeCompare(b.timelineId),
+    );
+    const seen = new Map<string, number>();
+    return sorted.map((ref) => {
+        const n = (seen.get(ref.name) ?? 0) + 1;
+        seen.set(ref.name, n);
+        return { ...ref, label: n === 1 ? ref.name : `${ref.name} (${String(n)})` };
+    });
 }

@@ -19,6 +19,7 @@ import {
     describeRun,
     diffLineClass,
     healthTone,
+    orderAttachments,
     parseAttachmentHref,
     resolveBuildContext,
     phaseTone,
@@ -297,7 +298,13 @@ export function renderRun(run: RunAttachment): HTMLElement {
  * The selector lives in a persistent header and only the body is swapped, so changing step
  * never re-creates the dropdown underneath the pointer.
  */
-export async function renderRuns(refs: readonly AttachmentRef[], fetch: RunFetcher, root: HTMLElement): Promise<void> {
+export async function renderRuns(
+    attachments: readonly AttachmentRef[],
+    fetch: RunFetcher,
+    root: HTMLElement,
+): Promise<void> {
+    // Deterministic order, and distinct labels where names collide -- see orderAttachments.
+    const refs = orderAttachments(attachments);
     root.textContent = '';
     if (refs.length === 0) {
         root.appendChild(
@@ -311,9 +318,9 @@ export async function renderRuns(refs: readonly AttachmentRef[], fetch: RunFetch
     root.appendChild(bar);
     root.appendChild(body);
 
-    let current = refs[0] as AttachmentRef;
+    let current = refs[0] as (AttachmentRef & { label: string });
 
-    const show = async (ref: AttachmentRef): Promise<void> => {
+    const show = async (ref: AttachmentRef & { label: string }): Promise<void> => {
         body.textContent = '';
         body.appendChild(statusBlock('Loading…'));
         try {
@@ -339,10 +346,10 @@ export async function renderRuns(refs: readonly AttachmentRef[], fetch: RunFetch
         const selectId = 'argocd-step-select';
         const select = el('select', { attrs: { id: selectId } });
         refs.forEach((ref, index) => {
-            select.appendChild(el('option', { text: ref.name, attrs: { value: String(index) } }));
+            select.appendChild(el('option', { text: ref.label, attrs: { value: String(index) } }));
         });
         select.addEventListener('change', () => {
-            current = refs[select.selectedIndex] as AttachmentRef;
+            current = refs[select.selectedIndex] as (AttachmentRef & { label: string });
             void show(current);
         });
         bar.appendChild(el('label', { text: 'Step', attrs: { for: selectId } }));
@@ -382,11 +389,6 @@ async function listRuns(): Promise<{ refs: AttachmentRef[]; fetch: RunFetcher }>
             refs.push(ref);
         }
     }
-
-    // Stable order. getAttachments' ordering is not documented, so without sorting the step
-    // dropdown can come back in a different order on the same build. The attachment names
-    // carry a sequence suffix, so this is also chronological.
-    refs.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
     const fetch: RunFetcher = async (ref) => {
         const buffer = await client.getAttachment(projectId, buildId, ref.timelineId, ref.recordId, RUN_ATTACHMENT_TYPE, ref.name);
