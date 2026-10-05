@@ -19,7 +19,9 @@ import {
     describeRun,
     diffLineClass,
     healthTone,
+    orderAttachments,
     parseAttachmentHref,
+    resolveBuildContext,
     phaseTone,
     shortRevision,
     syncTone,
@@ -296,7 +298,13 @@ export function renderRun(run: RunAttachment): HTMLElement {
  * The selector lives in a persistent header and only the body is swapped, so changing step
  * never re-creates the dropdown underneath the pointer.
  */
-export async function renderRuns(refs: readonly AttachmentRef[], fetch: RunFetcher, root: HTMLElement): Promise<void> {
+export async function renderRuns(
+    attachments: readonly AttachmentRef[],
+    fetch: RunFetcher,
+    root: HTMLElement,
+): Promise<void> {
+    // Deterministic order, and distinct labels where names collide -- see orderAttachments.
+    const refs = orderAttachments(attachments);
     root.textContent = '';
     if (refs.length === 0) {
         root.appendChild(
@@ -310,9 +318,9 @@ export async function renderRuns(refs: readonly AttachmentRef[], fetch: RunFetch
     root.appendChild(bar);
     root.appendChild(body);
 
-    let current = refs[0] as AttachmentRef;
+    let current = refs[0] as (AttachmentRef & { label: string });
 
-    const show = async (ref: AttachmentRef): Promise<void> => {
+    const show = async (ref: AttachmentRef & { label: string }): Promise<void> => {
         body.textContent = '';
         body.appendChild(statusBlock('Loading…'));
         try {
@@ -338,10 +346,10 @@ export async function renderRuns(refs: readonly AttachmentRef[], fetch: RunFetch
         const selectId = 'argocd-step-select';
         const select = el('select', { attrs: { id: selectId } });
         refs.forEach((ref, index) => {
-            select.appendChild(el('option', { text: ref.name, attrs: { value: String(index) } }));
+            select.appendChild(el('option', { text: ref.label, attrs: { value: String(index) } }));
         });
         select.addEventListener('change', () => {
-            current = refs[select.selectedIndex] as AttachmentRef;
+            current = refs[select.selectedIndex] as (AttachmentRef & { label: string });
             void show(current);
         });
         bar.appendChild(el('label', { text: 'Step', attrs: { for: selectId } }));
@@ -364,14 +372,12 @@ interface AttachmentLike {
 async function listRuns(): Promise<{ refs: AttachmentRef[]; fetch: RunFetcher }> {
     const projectService = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
     const buildService = await SDK.getService<IBuildPageDataService>(BuildServiceIds.BuildPageDataService);
-    const project = await projectService.getProject();
-    // getBuildPageData is synchronous despite sitting next to async service calls.
-    const buildPageData = buildService.getBuildPageData();
-    const projectId = project?.id;
-    const buildId = buildPageData?.build?.id;
-    if (projectId === undefined || buildId === undefined) {
-        throw new Error('This tab could not identify the build it is attached to.');
-    }
+    // Both are XDM proxies; resolveBuildContext awaits whatever they return, so it is
+    // correct whether the SDK's declaration says sync or async. See its doc comment.
+    const { projectId, buildId } = await resolveBuildContext(
+        () => projectService.getProject(),
+        () => buildService.getBuildPageData(),
+    );
 
     const client = getClient(BuildRestClient);
     const attachments = (await client.getAttachments(projectId, buildId, RUN_ATTACHMENT_TYPE)) as AttachmentLike[];
@@ -407,10 +413,12 @@ async function bootstrap(): Promise<void> {
         // Returns a promise: dropping it races the host's own loading state.
         await SDK.notifyLoadSucceeded();
     } catch (error) {
+        // .message, not String(error) -- the latter renders as "Error: ..." in the UI.
+        const detail = error instanceof Error ? error.message : String(error);
         root.textContent = '';
-        root.appendChild(statusBlock('Could not load Argo CD results.', String(error), 'status-error'));
+        root.appendChild(statusBlock('Could not load Argo CD results.', detail, 'status-error'));
         try {
-            await SDK.notifyLoadFailed(String(error));
+            await SDK.notifyLoadFailed(detail);
         } catch {
             /* SDK may not have initialised; nothing useful to do. */
         }
