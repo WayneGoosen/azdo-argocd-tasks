@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Stand up a local Argo CD for integration testing.
 #
-# CI runs this across the three supported minors. Run it locally to exercise the
-# tasks against a real server.
+# CI (the integration.yml workflow) runs this across the three supported Argo CD
+# minors. Run it locally to exercise the tasks against a real server.
 #
 #   ./scripts/kind-argocd.sh 3.5.3
 #   source .argocd-env && npx vitest run test/integration
