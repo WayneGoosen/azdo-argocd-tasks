@@ -168,7 +168,7 @@ Use imperative mood ("add feature" not "adds feature" or "added feature").
 1. **Create a feature branch** from `main`
 2. **Make your changes** and commit them using [Conventional Commits](#commit-style)
 3. **Push your branch** to GitHub
-4. **Open a pull request** against `main`
+4. **Open a pull request** against `main`. GitHub pre-fills the [pull request template](.github/pull_request_template.md) — complete the description, related issue, and checklist.
 
 ### What CI Checks
 
@@ -197,8 +197,9 @@ See [`STATUS.md`](STATUS.md) for:
 
 ## Questions or Issues?
 
-- **Bug reports** — [open an issue](https://github.com/WayneGoosen/azdo-argocd-tasks/issues/new)
-- **Feature requests** — [open an issue](https://github.com/WayneGoosen/azdo-argocd-tasks/issues/new) describing the use case
+- **Bug reports** — [open a bug report](https://github.com/WayneGoosen/azdo-argocd-tasks/issues/new?template=bug.yml) using the bug issue form
+- **Feature requests** — [open a feature request](https://github.com/WayneGoosen/azdo-argocd-tasks/issues/new?template=feature.yml) using the feature issue form
+- **Security vulnerabilities** — do not open a public issue; report privately following [`SECURITY.md`](SECURITY.md)
 - **Documentation** — see the [published docs](https://waynegoosen.github.io/azdo-argocd-tasks/)
 
 ## License

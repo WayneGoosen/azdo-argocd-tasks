@@ -1,0 +1,107 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+
+  - type: input
+    id: argocd-version
+    attributes:
+      label: Argo CD Version
+      description: What version of Argo CD are you using?
+      placeholder: e.g., v2.8.4
+    validations:
+      required: true
+
+  - type: input
+    id: task-command
+    attributes:
+      label: Task and Command
+      description: Which task and command are you using?
+      placeholder: e.g., ArgoCDApp@1 / sync
+    validations:
+      required: true
+
+  - type: input
+    id: agent-version
+    attributes:
+      label: Azure Pipelines Agent Version
+      description: What version of the Azure Pipelines agent are you using?
+      placeholder: e.g., 3.220.5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent-type
+    attributes:
+      label: Agent Type
+      description: Are you using a hosted or self-hosted agent?
+      options:
+        - Microsoft-hosted
+        - Self-hosted
+    validations:
+      required: true
+
+  - type: dropdown
+    id: azdo-type
+    attributes:
+      label: Azure DevOps Type
+      description: Are you using Azure DevOps Services or Azure DevOps Server?
+      options:
+        - Azure DevOps Services (cloud)
+        - Azure DevOps Server (on-premises)
+    validations:
+      required: true
+
+  - type: textarea
+    id: pipeline-yaml
+    attributes:
+      label: Pipeline YAML Snippet
+      description: |
+        Please provide the relevant YAML snippet from your pipeline.
+        ⚠️ **Warning:** Make sure to redact any tokens, credentials, and server URLs before submitting.
+      placeholder: |
+        - task: ArgoCDApp@1
+          inputs:
+            argocdServer: '***REDACTED***'
+            ...
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log Excerpt
+      description: |
+        Please provide relevant log output from the pipeline run.
+        ⚠️ **Warning:** Make sure to redact any tokens, credentials, and server URLs before submitting.
+      placeholder: Paste the log output here
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here.

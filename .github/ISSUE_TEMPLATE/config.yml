@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/WayneGoosen/azdo-argocd-tasks/blob/main/README.md
+    about: Check the project documentation for usage information and examples
+  - name: Security Policy
+    url: https://github.com/WayneGoosen/azdo-argocd-tasks/blob/main/SECURITY.md
+    about: Report security vulnerabilities according to our security policy
