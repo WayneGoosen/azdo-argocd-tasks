@@ -99,6 +99,7 @@ jobs:
         run: |
           kubectl get applications -n argocd -o wide || true
           kubectl get pods -A || true
+          kubectl describe pods -n argocd || true
           kubectl logs -n argocd deploy/argocd-server --tail=100 || true
           kubectl logs -n argocd statefulset/argocd-application-controller --tail=100 || true
 
