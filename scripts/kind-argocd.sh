@@ -59,7 +59,7 @@ pull_image() {
         if docker pull "${image}"; then
             return 0
         fi
-        if [ "${attempt}" -ge "${max_attempts}" ]; then
+        if [[ "${attempt}" -ge "${max_attempts}" ]]; then
             echo "Failed to pull ${image} after ${max_attempts} attempts" >&2
             return 1
         fi
@@ -91,7 +91,8 @@ echo "==> Installing Argo CD v${ARGOCD_VERSION}"
 kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
 INSTALL_MANIFEST=$(mktemp)
-curl -fsSL --retry 5 --retry-delay 5 \
+# --proto '=https' refuses an http:// redirect, which curl -L would otherwise follow.
+curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-delay 5 \
     -o "${INSTALL_MANIFEST}" \
     "https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/install.yaml"
 
@@ -105,13 +106,13 @@ curl -fsSL --retry 5 --retry-delay 5 \
 echo "==> Pre-loading images into the kind cluster"
 images=()
 while IFS= read -r image; do
-    [ -n "${image}" ] || continue
+    [[ -n "${image}" ]] || continue
     images+=("${image}")
 done < <(grep -E '^[[:space:]]+image:[[:space:]]+' "${INSTALL_MANIFEST}" \
     | sed -E 's/^[[:space:]]+image:[[:space:]]+//; s/^["'\'']//; s/["'\'']$//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//' \
     | sort -u)
 
-if [ "${#images[@]}" -eq 0 ]; then
+if [[ "${#images[@]}" -eq 0 ]]; then
     echo "No container images found in the Argo CD v${ARGOCD_VERSION} install manifest" >&2
     rm -f "${INSTALL_MANIFEST}"
     exit 1
