@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Stand up a local Argo CD for integration testing.
 #
-# Not run by CI yet -- this is the harness a future integration matrix will call across the
-# three supported minors. Run it locally to exercise the tasks against a real server.
+# CI runs this across the three supported minors. Run it locally to exercise the
+# tasks against a real server.
 #
 #   ./scripts/kind-argocd.sh 3.5.3
 #   source .argocd-env && npx vitest run test/integration
@@ -31,14 +31,57 @@ PERSIST_PORT_FORWARD="${PERSIST_PORT_FORWARD:-false}"
 CREATE_SAMPLE_APP="${CREATE_SAMPLE_APP:-false}"
 SAMPLE_APP="${SAMPLE_APP:-guestbook}"
 
-for tool in kind kubectl argocd; do
+for tool in docker kind kubectl argocd; do
     command -v "$tool" >/dev/null 2>&1 || {
         echo "Missing required tool: $tool" >&2
+        echo "  docker:  required to pre-pull images and for kind to create the cluster" >&2
         echo "  kind:    https://kind.sigs.k8s.io/docs/user/quick-start/#installation" >&2
         echo "  argocd:  https://argo-cd.readthedocs.io/en/stable/cli_installation/" >&2
         exit 1
     }
 done
+
+# Host-side pull with retries/backoff. In-cluster pulls (especially public.ecr.aws
+# redis) flake under rate limits; docker on the runner is the only place a retry
+# actually helps. Skip the pull when the image is already local so a re-run is
+# not held hostage by the same registry blip.
+pull_image() {
+    local image="$1"
+    local attempt=1
+    local delay=5
+    local max_attempts=5
+    if docker image inspect "${image}" >/dev/null 2>&1; then
+        echo "    already present: ${image}"
+        return 0
+    fi
+    while true; do
+        echo "    docker pull ${image} (attempt ${attempt}/${max_attempts})"
+        if docker pull "${image}"; then
+            return 0
+        fi
+        if [ "${attempt}" -ge "${max_attempts}" ]; then
+            echo "Failed to pull ${image} after ${max_attempts} attempts" >&2
+            return 1
+        fi
+        echo "    pull failed; retrying in ${delay}s"
+        sleep "${delay}"
+        attempt=$((attempt + 1))
+        delay=$((delay * 2))
+    done
+}
+
+# On a timed-out rollout, dump pod describe so ImagePullBackOff (and similar)
+# shows up in CI logs instead of only "error: timed out waiting for the condition".
+wait_rollout() {
+    local resource="$1"
+    if kubectl rollout status -n "${NAMESPACE}" "${resource}" --timeout=300s; then
+        return 0
+    fi
+    echo "==> ${resource} failed to become ready; dumping pod state" >&2
+    kubectl get pods -n "${NAMESPACE}" -o wide || true
+    kubectl describe pods -n "${NAMESPACE}" || true
+    return 1
+}
 
 echo "==> Creating kind cluster '${CLUSTER_NAME}'"
 kind get clusters 2>/dev/null | grep -qx "${CLUSTER_NAME}" || kind create cluster --name "${CLUSTER_NAME}"
@@ -46,17 +89,59 @@ kubectl cluster-info --context "kind-${CLUSTER_NAME}" >/dev/null
 
 echo "==> Installing Argo CD v${ARGOCD_VERSION}"
 kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n "${NAMESPACE}" --server-side --force-conflicts \
-    -f "https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/install.yaml"
+
+INSTALL_MANIFEST=$(mktemp)
+curl -fsSL --retry 5 --retry-delay 5 \
+    -o "${INSTALL_MANIFEST}" \
+    "https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/install.yaml"
+
+# Kind nodes pull from the public registry on first use. That is the flake:
+# GitHub runners hitting public.ecr.aws (redis) or quay.io occasionally get
+# rate-limited, the pod sits in ImagePullBackOff, and `rollout status` times
+# out after five minutes with argocd-server logging
+# `dial tcp ...:6379: connection refused`. Pull every image the install
+# manifest references on the host, then load them into the cluster so kubelet
+# never has to talk to a registry.
+echo "==> Pre-loading images into the kind cluster"
+images=()
+while IFS= read -r image; do
+    [ -n "${image}" ] || continue
+    images+=("${image}")
+done < <(grep -E '^[[:space:]]+image:[[:space:]]+' "${INSTALL_MANIFEST}" \
+    | sed -E 's/^[[:space:]]+image:[[:space:]]+//; s/^["'\'']//; s/["'\'']$//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//' \
+    | sort -u)
+
+if [ "${#images[@]}" -eq 0 ]; then
+    echo "No container images found in the Argo CD v${ARGOCD_VERSION} install manifest" >&2
+    rm -f "${INSTALL_MANIFEST}"
+    exit 1
+fi
+
+for image in "${images[@]}"; do
+    pull_image "${image}"
+done
+kind load docker-image "${images[@]}" --name "${CLUSTER_NAME}"
+
+# Argo CD's install sets imagePullPolicy: Always on redis, dex, and most of
+# the argocd containers. With Always, kubelet still contacts the registry
+# even after `kind load`, which is exactly the flake. IfNotPresent uses the
+# image we just loaded. awk rather than sed -i so this is the same on GNU
+# and BSD.
+awk '{sub(/imagePullPolicy: Always/, "imagePullPolicy: IfNotPresent")} {print}' \
+    "${INSTALL_MANIFEST}" > "${INSTALL_MANIFEST}.ifnotpresent"
+mv "${INSTALL_MANIFEST}.ifnotpresent" "${INSTALL_MANIFEST}"
+
+kubectl apply -n "${NAMESPACE}" --server-side --force-conflicts -f "${INSTALL_MANIFEST}"
+rm -f "${INSTALL_MANIFEST}"
 
 echo "==> Waiting for Argo CD to become available"
 # All of these must be up, not just the API server: the server and repo-server both cache
 # through redis, and a missing redis surfaces to the client as an opaque HTTP 500
 # ("dial tcp ...:6379: connection refused") rather than as a readiness problem.
 for deploy in argocd-redis argocd-repo-server argocd-server argocd-applicationset-controller; do
-    kubectl rollout status -n "${NAMESPACE}" "deployment/${deploy}" --timeout=300s
+    wait_rollout "deployment/${deploy}"
 done
-kubectl rollout status -n "${NAMESPACE}" statefulset/argocd-application-controller --timeout=300s
+wait_rollout statefulset/argocd-application-controller
 
 echo "==> Creating the '${ACCOUNT}' apiKey account"
 kubectl patch configmap argocd-cm -n "${NAMESPACE}" --type merge \
@@ -64,7 +149,7 @@ kubectl patch configmap argocd-cm -n "${NAMESPACE}" --type merge \
 kubectl patch configmap argocd-rbac-cm -n "${NAMESPACE}" --type merge \
     -p "{\"data\":{\"policy.default\":\"\",\"policy.csv\":\"p, role:${ACCOUNT}, applications, *, */*, allow\\np, role:${ACCOUNT}, applicationsets, *, */*, allow\\np, role:${ACCOUNT}, projects, get, *, allow\\np, role:${ACCOUNT}, logs, get, */*, allow\\np, role:${ACCOUNT}, exec, create, */*, allow\\ng, ${ACCOUNT}, role:${ACCOUNT}\\n\"}}"
 kubectl rollout restart -n "${NAMESPACE}" deployment/argocd-server
-kubectl rollout status -n "${NAMESPACE}" deployment/argocd-server --timeout=300s
+wait_rollout deployment/argocd-server
 
 echo "==> Port-forwarding argocd-server to localhost:${LOCAL_PORT}"
 # kubectl port-forward drops its connection on longer runs -- it is a single TCP
