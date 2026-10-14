@@ -60,9 +60,9 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: '@vitest/*'
         update-types: ['version-update:semver-major']
-      # Kept: the Node20_1 handler is the lower bound both bundles target, so @types/node
-      # must not describe APIs an agent will not have. (Vitest 5 would have forced this --
-      # its peer is `^22 || >=24` -- but Vitest 5 is held above anyway.)
+      # @types/node is ^22.12.0 to satisfy vitest 5's peer (`^22 || >=24`) and vite 7's
+      # (`^20.19.0 || >=22.12.0`). Further majors (24+) stay ignored: CI and the Node20_1
+      # handler remain on Node 20, so types should not describe APIs an agent will not have.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
 
