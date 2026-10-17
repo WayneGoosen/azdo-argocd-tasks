@@ -48,9 +48,9 @@ jobs:
           # anything uploaded by hand, and it never catches up afterwards.
           #
           # Ask the Marketplace what is actually published and increment that instead.
-          # Also used by the publish step below. Use the lockfile tfx (npm ci above),
-          # not `npm i -g` — zizmor flags ad-hoc package installs.
-          PUBLISHED=$(npx tfx-cli extension show \
+          # Also used by the publish step below. Invoke the lockfile binary directly
+          # (`npx` is a Sonar S6505/S8543 finding; `npm i -g` is a zizmor one).
+          PUBLISHED=$(./node_modules/.bin/tfx extension show \
             --publisher "$(jq -r .publisher vss-extension.json)" \
             --extension-id "$(jq -r .id vss-extension.dev.json)" \
             --token "$TFX_TOKEN" --json --no-color 2>/dev/null \
@@ -81,7 +81,7 @@ jobs:
           SHARE_WITH: ${{ inputs.share_with }}
         run: |
           set -euo pipefail
-          npx tfx-cli extension publish \
+          ./node_modules/.bin/tfx extension publish \
             --manifest-globs vss-extension.json \
             --overrides-file vss-extension.dev.effective.json \
             --share-with "$SHARE_WITH" \

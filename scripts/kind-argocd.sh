@@ -45,7 +45,7 @@ done
 # redis) flake under rate limits; docker on the runner is the only place a retry
 # actually helps. Skip the pull when the image is already local so a re-run is
 # not held hostage by the same registry blip.
-pull_image() {
+try_pull() {
     local image="$1"
     local attempt=1
     local delay=5
@@ -60,7 +60,6 @@ pull_image() {
             return 0
         fi
         if [[ "${attempt}" -ge "${max_attempts}" ]]; then
-            echo "Failed to pull ${image} after ${max_attempts} attempts" >&2
             return 1
         fi
         echo "    pull failed; retrying in ${delay}s"
@@ -68,6 +67,27 @@ pull_image() {
         attempt=$((attempt + 1))
         delay=$((delay * 2))
     done
+}
+
+pull_image() {
+    local image="$1"
+    if try_pull "${image}"; then
+        return 0
+    fi
+    # public.ecr.aws/docker/library/* is Docker Hub's official library, mirrored.
+    # GitHub-hosted runners regularly hit ECR Public "Data limit exceeded" on
+    # redis while Docker Hub still serves the same image. Tag it back so
+    # `kind load` and the install manifest keep the original name.
+    if [[ "${image}" == public.ecr.aws/docker/library/* ]]; then
+        local fallback="docker.io/library/${image#public.ecr.aws/docker/library/}"
+        echo "    falling back to ${fallback}"
+        if try_pull "${fallback}"; then
+            docker tag "${fallback}" "${image}"
+            return 0
+        fi
+    fi
+    echo "Failed to pull ${image} after retries (and fallback, if any)" >&2
+    return 1
 }
 
 # On a timed-out rollout, dump pod describe so ImagePullBackOff (and similar)

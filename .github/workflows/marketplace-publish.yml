@@ -35,8 +35,9 @@ jobs:
           cache: npm
 
       # tfx from the lockfile (tfx-cli@^0.24.2, first line that recognises Node24).
-      # Avoids `npm i -g`, which zizmor flags as an ad-hoc package install.
-      - run: npm ci
+      # --ignore-scripts: this job only needs the tfx binary (Sonar S6505).
+      # Avoids `npm i -g` (zizmor adhoc-packages) and `npx` (Sonar S6505/S8543).
+      - run: npm ci --ignore-scripts
 
       - name: Download the VSIX from the release
         env:
@@ -50,4 +51,4 @@ jobs:
         run: |
           set -euo pipefail
           VSIX=$(ls dist/*.vsix)
-          npx tfx-cli extension publish --vsix "$VSIX" --token "$TFX_TOKEN" --no-color
+          ./node_modules/.bin/tfx extension publish --vsix "$VSIX" --token "$TFX_TOKEN" --no-color
