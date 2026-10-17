@@ -124,21 +124,22 @@ gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq '.object.sha'
 If `.object.type` is `tag` rather than `commit` it is an annotated tag — dereference it with
 `gh api repos/<owner>/<repo>/git/tags/<sha> --jq '.object.sha'` to get the commit.
 
-**SonarCloud is configured but not yet connected.** `sonar-project.properties` assumes
-`organization=waynegoosen` and `projectKey=WayneGoosen_azdo-argocd-tasks`. To turn it on:
+**SonarCloud Automatic Analysis is connected** (the `SonarCloud Code Analysis` check
+on pull requests). The CI scanner step in `pr.yml` still skips unless `SONAR_TOKEN`
+is set — do not enable both; Automatic plus the scanner fails with "you are running
+manual analysis while Automatic Analysis is enabled". `sonar-project.properties`
+assumes `organization=waynegoosen` and `projectKey=WayneGoosen_azdo-argocd-tasks`.
+To switch the check over to CI-based analysis:
 
-1. Import the repo at <https://sonarcloud.io> (free for public repositories) and confirm the
-   organization and project key match the properties file.
-2. Create a token and add it:
+1. Create a token and add it:
    ```sh
    gh secret set SONAR_TOKEN --repo WayneGoosen/azdo-argocd-tasks
    ```
-3. In SonarCloud, set the project's analysis method to **CI-based**, not Automatic Analysis.
-   Leaving Automatic on makes the scanner step fail with "you are running manual analysis
-   while Automatic Analysis is enabled".
+2. In SonarCloud, set the project's analysis method to **CI-based**, not Automatic Analysis.
 
-Until the secret exists the SonarCloud step **skips itself**, deliberately — `build` is a
-required check and must never fail because an optional integration is unconfigured.
+The CI scanner step **skips itself** without the secret, deliberately — `build` is a
+required check and must never fail because that optional path is unconfigured. The
+Automatic Analysis check is separate and still runs on every pull request.
 
 **Coverage is understated and that is expected.** The e2e suite runs the *bundled* artifacts
 in a child process, which v8 coverage cannot instrument, so a well-tested task entry point
@@ -202,7 +203,8 @@ See [`../STATUS.md`](../STATUS.md) for the full picture: current state, blockers
 
 
 - CHANGELOG generation. Release notes come from `gh release create --generate-notes`.
-- Integration tests have never actually run. `integration.yml` and `scripts/kind-argocd.sh`
-  are written and wired up, but nothing has been pushed, so no workflow has executed. Run the
-  matrix before trusting any "verified against 3.3/3.4/3.5" claim.
+- Integration tests run in `integration.yml` on a kind cluster across the Argo CD
+  versions upstream supports (currently 3.3 / 3.4 / 3.5). A green matrix is the
+  verification; the workflow file alone is not. Locally: `./scripts/kind-argocd.sh`
+  then `source .argocd-env && npx vitest run test/integration`.
 - The PAT to workload-identity migration described above.
