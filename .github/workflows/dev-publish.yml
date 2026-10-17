@@ -28,6 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -47,9 +48,9 @@ jobs:
           # anything uploaded by hand, and it never catches up afterwards.
           #
           # Ask the Marketplace what is actually published and increment that instead.
-          # Also used by the publish step below.
-          npm i -g tfx-cli@^0.24.2 >/dev/null 2>&1
-          PUBLISHED=$(tfx extension show \
+          # Also used by the publish step below. Use the lockfile tfx (npm ci above),
+          # not `npm i -g` — zizmor flags ad-hoc package installs.
+          PUBLISHED=$(npx tfx-cli extension show \
             --publisher "$(jq -r .publisher vss-extension.json)" \
             --extension-id "$(jq -r .id vss-extension.dev.json)" \
             --token "$TFX_TOKEN" --json --no-color 2>/dev/null \
@@ -77,11 +78,12 @@ jobs:
       - name: Publish and share
         env:
           TFX_TOKEN: ${{ secrets.ADO_PUBLISHER_PAT }}
+          SHARE_WITH: ${{ inputs.share_with }}
         run: |
           set -euo pipefail
-          tfx extension publish \
+          npx tfx-cli extension publish \
             --manifest-globs vss-extension.json \
             --overrides-file vss-extension.dev.effective.json \
-            --share-with "${{ inputs.share_with }}" \
+            --share-with "$SHARE_WITH" \
             --token "$TFX_TOKEN" \
             --no-color

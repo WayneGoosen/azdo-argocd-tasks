@@ -202,7 +202,8 @@ See [`../STATUS.md`](../STATUS.md) for the full picture: current state, blockers
 
 
 - CHANGELOG generation. Release notes come from `gh release create --generate-notes`.
-- Integration tests have never actually run. `integration.yml` and `scripts/kind-argocd.sh`
-  are written and wired up, but nothing has been pushed, so no workflow has executed. Run the
-  matrix before trusting any "verified against 3.3/3.4/3.5" claim.
+- Integration tests run in `integration.yml` on a kind cluster across the Argo CD
+  versions upstream supports (currently 3.3 / 3.4 / 3.5). A green matrix is the
+  verification; the workflow file alone is not. Locally: `./scripts/kind-argocd.sh`
+  then `source .argocd-env && npx vitest run test/integration`.
 - The PAT to workload-identity migration described above.
