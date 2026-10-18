@@ -1,0 +1,10 @@
+# Single-maintainer repo: default review owner, plus explicit owners on
+# paths that can ship a Marketplace version you cannot replace or change
+# what runs with ADO_PUBLISHER_PAT.
+
+* @WayneGoosen
+
+.github/workflows/ @WayneGoosen
+scripts/ @WayneGoosen
+vss-extension*.json @WayneGoosen
+tasks/*/task.json @WayneGoosen

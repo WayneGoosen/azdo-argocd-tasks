@@ -1,4 +1,5 @@
 # Pull request gate: typecheck, test, and prove the VSIX actually packages.
+# Also lints the workflows themselves (zizmor + actionlint).
 #
 # The VSIX asset assertion is not ceremony. tfx SILENTLY drops Content.Details and
 # Screenshots.N if the marketplace/ folder is listed in vss-extension.json "files", and the
@@ -9,13 +10,16 @@ on:
   pull_request:
     branches: [main]
 
+# Workflow-level is read-only. Write stays on the job that comments.
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     env:
       # A BOOLEAN, not the secret. A step's own `env:` is applied after its `if:` is
       # evaluated, so the condition needs something at job scope -- but putting the token
@@ -26,6 +30,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # GitVersion counts from repo init without full history
+          persist-credentials: false
 
       - uses: gittools/actions/gitversion/setup@7417b1089e2c7de93510f1901d656ddf60bb024f # v4.7.0
         with:
@@ -57,7 +62,9 @@ jobs:
         name: Unit, contract and end-to-end tests
 
       - name: Stamp version
-        run: node scripts/stamp-version.mjs "${{ steps.gitversion.outputs.majorMinorPatch }}"
+        env:
+          VERSION: ${{ steps.gitversion.outputs.majorMinorPatch }}
+        run: node scripts/stamp-version.mjs "$VERSION"
 
       - run: npm run package
         name: Package VSIX
@@ -144,9 +151,11 @@ jobs:
 
       - name: Comment the calculated version
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          VERSION: ${{ steps.gitversion.outputs.majorMinorPatch }}
         with:
           script: |
-            const version = '${{ steps.gitversion.outputs.majorMinorPatch }}';
+            const version = process.env.VERSION;
             const marker = '<!-- argocd-tasks-version -->';
             const body = `${marker}\n**Version if merged:** \`${version}\`\n\nThe \`.vsix\` is attached to this run as an artifact.`;
             const { data: comments } = await github.rest.issues.listComments({
@@ -158,3 +167,25 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
             }
+
+  # GitHub Actions security + syntax. Separate job so a workflow finding cannot
+  # hide behind a green typecheck, and so this job stays contents:read only.
+  workflow-lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: zizmor
+        uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
+        with:
+          # Public repo; do not request security-events: write for SARIF upload.
+          advanced-security: false
+          annotations: true
+          collect: workflows
+
+      - name: actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
