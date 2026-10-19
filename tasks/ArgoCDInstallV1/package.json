@@ -9,7 +9,7 @@
         "@azdo-argocd/argocd-client": "*",
         "@azdo-argocd/cli-runner": "*",
         "@azdo-argocd/task-common": "*",
-        "azure-pipelines-task-lib": "^5.281.1",
+        "azure-pipelines-task-lib": "^5.281.2",
         "azure-pipelines-tool-lib": "^2.281.0"
     }
 }
